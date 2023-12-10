@@ -1,12 +1,16 @@
 # NeuroPACS Python SDK
 
-## Install neuropacs from pip
+Connect to NeuroPACS diagnostic capabilities with our Python SDK.
+
+## Getting Started
+
+### Install neuropacs from pip
 
 ```bash
 pip install neuropacs
 ```
 
-## Usage
+### Usage
 
 ```py
 import neuropacs
@@ -50,3 +54,17 @@ job_status = npcs.check_status(order_id, connection_id, aes_key)
 # --> Valid prediction_format options: TXT, PDF, XML, JSON, DICOMSR
 job_results = npcs.get_results(prediction_format, order_id, connection_id, aes_key)
 ```
+
+## Authors
+
+Kerrick Cavanaugh - kerrick@neuropacs.com
+
+## Version History
+
+- 1.3.6
+  - Initial Release
+  - See [release history](https://pypi.org/project/neuropacs/#history)
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details
