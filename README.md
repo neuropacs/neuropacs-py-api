@@ -4,7 +4,7 @@ Connect to NeuroPACS diagnostic capabilities with our Python SDK.
 
 ## Getting Started
 
-### Install neuropacs from pip
+### Installation
 
 ```bash
 pip install neuropacs
