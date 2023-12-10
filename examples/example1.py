@@ -1,9 +1,8 @@
 import neuropacs
 
 def main():
-    api_key = "m0ig54amrl87awtwlizcuji2bxacjm"
-    server_url = "http://ec2-3-17-163-24.us-east-2.compute.amazonaws.com:5000"
-    # server_url = "http://localhost:5000"
+    api_key = "your_api_key"
+    server_url = "http://your_neuropacs_url:5000"
     product_id = "PD/MSA/PSP-v1.0"
 
     # PRINT CURRENT VERSION
@@ -28,7 +27,7 @@ def main():
     print(f"orderID: {order_id}")
 
     # # # # #UPLOAD AN IMAGE
-    npcs.upload_dataset("./06_001",order_id,connection_id, aes_key)
+    npcs.upload_dataset("./dicom_examples/06_001",order_id,connection_id, aes_key)
 
 
     # connection_id: 42b2de6a603577ac4d7ff5309149d82c
