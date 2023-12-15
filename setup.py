@@ -28,6 +28,8 @@ setup(
         'wheel==0.41.2',
         'python-socketio==5.10.0',
         'tqdm==4.66.1'
+        # add secrets
+        # add string
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

@@ -5,6 +5,8 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 from Crypto.PublicKey import RSA
 import base64
+import string
+import secrets
 import time
 from tqdm import tqdm
 import socketio
@@ -17,11 +19,10 @@ import requests
 import base64
 
 class Neuropacs:
-    def __init__(self, api_key,server_url):
+    def __init__(self, server_url):
         """
         NeuroPACS constructor
         """
-        self.api_key = api_key
         self.server_url = server_url
         self.sio = socketio.Client()
         self.setup_socket_events()
@@ -48,8 +49,6 @@ class Neuropacs:
             print("Upload failed on server side, ending upload process.")
             self.disconnect_from_socket()
         
-
-
     def disconnect_from_socket(self):
         self.sio.disconnect()
 
@@ -145,6 +144,7 @@ class Neuropacs:
         if(res.status_code != 200):
             raise Exception(f"Public key retrieval failed!")
             
+
         json = res.json()
         pub_key = json['pub_key']
         return pub_key
@@ -276,6 +276,7 @@ class Neuropacs:
                 self.sio.emit('file_data', {'data': message, 'headers': headers})
 
                 max_ack_wait_time = 10   #10 seconds
+
                 start_time = time.time()
                 elapsed_time = 0
                 while (not self.ack_recieved) and (elapsed_time < max_ack_wait_time):
@@ -289,6 +290,14 @@ class Neuropacs:
                     self.disconnect_from_socket()
 
                 return 201
+
+    def generate_filename(self):
+        """Generate a filename for byte data
+        :return: 20 character random alphanumeric string
+        """
+        characters = string.ascii_letters + string.digits
+        random_string = ''.join(secrets.choice(characters) for _ in range(20))
+        return random_string
 
     def new_job (self, connection_id, aes_key):
         """Create a new order
@@ -307,10 +316,10 @@ class Neuropacs:
             text = self.decrypt_aes_ctr(text, aes_key, "string")
             return text
         else:
-            raise Exception(f"Job creation returned status {res.status_code}.")
+            raise Exception(f"Job creation failed!")
 
 
-    def run_job(self, productID, order_id, connection_id, aes_key):
+    def run_job(self, product_id, order_id, connection_id, aes_key):
         """Run a job
         
         :param str productID: Product to be executed.
@@ -325,7 +334,7 @@ class Neuropacs:
 
         body = {
             'orderID': order_id,
-            'productID': productID
+            'productID': product_id
         }
 
         encryptedBody = self.encrypt_aes_ctr(body, aes_key, "json", "string")
@@ -361,7 +370,6 @@ class Neuropacs:
             json = self.decrypt_aes_ctr(text,aes_key,"json")
             return json
         else:
-            print(self.decrypt_aes_ctr(res.text, aes_key,"string"))
             raise RuntimeError("Status check failed.")
 
     def get_results(self, format, order_id, connection_id, aes_key):
@@ -382,10 +390,10 @@ class Neuropacs:
             'format': format
         }
 
-        validFormats = ["TXT", "XML", "JSON", "DICOMSR", "PDF"]
+        validFormats = ["TXT", "XML", "JSON"]
 
         if format not in validFormats:
-            raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PDF\", \"DICOMSR\".")
+            raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\".")
 
         encrypted_body = self.encrypt_aes_ctr(body, aes_key, "json", "string")
 
@@ -452,61 +460,6 @@ class Neuropacs:
 
         except:
             raise Exception("AES encryption failed!")   
-
-            
-    # def encrypt_aes_ctr2(self, plaintext, aes_key, format_out): 
-    #     """AES CTR encrypt plaintext
-
-    #     :param JSON/str/bytes plaintext: Plaintext to be encrypted.
-    #     :param str aes_key: Base64 AES key.
-    #     :param str format_in: format of plaintext. Defaults to "string".
-    #     :param str format_out: format of ciphertext. Defaults to "string".
-
-    #     :return: Encrypted ciphertext in requested format_out.
-    #     """        
-
-    #     plaintext_bytes = ""
-
-    #     try:
-    #         json.loads(plaintext)
-    #         plaintext_json = json.dumps(plaintext)
-    #         plaintext_bytes = plaintext_json.encode("utf-8")
-    #     except:
-    #         if isinstance(plaintext, str):
-    #             plaintext_bytes = plaintext.encode("utf-8")
-    #         elif isinstance(plaintext,bytes):
-    #             plaintext_bytes = plaintext
-    #         else:
-    #             raise Exception("Invalid plaintext format!")
-
-    #     try:
-    #         aes_key_bytes = base64.b64decode(aes_key)
-
-    #         padded_plaintext = pad(plaintext_bytes, AES.block_size)
-
-    #         # generate IV
-    #         iv = get_random_bytes(16)
-
-    #         # Create an AES cipher object in CTR mode
-    #         cipher = AES.new(aes_key_bytes, AES.MODE_CTR, initial_value=iv, nonce=b'')
-
-    #         # Encrypt the plaintext
-    #         ciphertext = cipher.encrypt(padded_plaintext)
-
-    #         # Combine IV and ciphertext
-    #         encrypted_data = iv + ciphertext
-
-    #         encryped_message = ""
-
-    #         if format_out == "string":
-    #             encryped_message = base64.b64encode(encrypted_data).decode('utf-8')
-    #         elif format_out == "bytes":
-    #             encryped_message = encrypted_data
-
-    #         return encryped_message
-
-    #     except:
-    #         raise Exception("AES encryption failed!") 
 
 
     def decrypt_aes_ctr(self,encrypted_data, aes_key, format_out):

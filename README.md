@@ -24,7 +24,7 @@ prediction_format = "XML"
 version = neuropacs.PACKAGE_VERSION
 
 #INITIALIZE NEUROPACS SDK
-npcs = neuropacs.init(api_key, server_url)
+npcs = neuropacs.init(server_url)
 
 #GENERATE AN AES KEY
 aes_key = npcs.generate_aes_key()
