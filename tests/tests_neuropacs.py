@@ -2,6 +2,8 @@ import unittest
 import re
 import json
 from neuropacs.sdk import Neuropacs
+from datetime import datetime
+
 
 # RUN TESTS: python -m unittest tests.tests_neuropacs
 
@@ -341,9 +343,11 @@ class UnitTests(unittest.TestCase):
 
         job_results = self.npcs.get_results("TXT", "TEST", connection_id, aes_key) # Get results
 
+        current_date = datetime.now().strftime("%Y-%m-%d")
+
         ### TEST JOB RESULTS ###
         self.assertIsInstance(job_results, str, "Job results should be a string")
-        self.assertEqual(job_results, "Order ID: TEST\nDate: 2023-12-15\nProduct: TEST\nPD probability vs. MSA/PSP: 62.6%\nMSA probability vs. PSP: 85.6%\nBiomarker levels: pSN=0.26, Putamen=0.19, SCP=0.48, MCP=0.07")
+        self.assertEqual(job_results, f"Order ID: TEST\nDate: {current_date}\nProduct: TEST\nPD probability vs. MSA/PSP: 62.6%\nMSA probability vs. PSP: 85.6%\nBiomarker levels: pSN=0.26, Putamen=0.19, SCP=0.48, MCP=0.07")
         ### TEST JOB RESULTS ###
 
     # Test 18: get_results() - SUCCESS (JSON)
@@ -361,8 +365,13 @@ class UnitTests(unittest.TestCase):
 
         job_results = self.npcs.get_results("JSON", "TEST", connection_id, aes_key) # Get results
 
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        expected_result_pt1 = r'{"orderID":"TEST","date":"'
+        expected_result_pt2 = r'","product":"TEST","result":{"PDprobability":"62.6","MSAprobability":"85.6","FWpSN":"0.26","FWPutamen":"0.19","FWSCP":"0.48","FWMCP":"0.07"}}'
+        expected_result_full = expected_result_pt1 + current_date + expected_result_pt2
+
         # ### TEST JOB RESULTS ###
-        self.assertEqual(re.sub(r'\s', '', job_results), r'{"orderID":"TEST","date":"2023-12-15","product":"TEST","result":{"PDprobability":"62.6","MSAprobability":"85.6","FWpSN":"0.26","FWPutamen":"0.19","FWSCP":"0.48","FWMCP":"0.07"}}')
+        self.assertEqual(re.sub(r'\s', '', job_results), expected_result_full)
         try:
             json_object = json.loads(job_results)
             self.assertIsInstance(json_object, dict)
@@ -385,8 +394,14 @@ class UnitTests(unittest.TestCase):
 
         job_results = self.npcs.get_results("XML", "TEST", connection_id, aes_key) # Get results
 
+        expected_result_pt1 = r'<?xmlversion="1.0"encoding="UTF-8"standalone="yes"?><neuropacsorderID="TEST"date="'
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        expected_result_pt2 = r'"product="TEST"><resultname="PDprobability"value="62.6"/><resultname="MSAprobability"value="85.6"/><dataname="FWpSN"value="0.26"/><dataname="FWPutamen"value="0.19"/><dataname="FWSCP"value="0.48"/><dataname="FWMCP"value="0.07"/></neuropacs>'
+        expected_result_full = expected_result_pt1 + current_date + expected_result_pt2
+
+
         ### TEST JOB RESULTS ###
-        self.assertEqual(re.sub(r'\s', '', job_results), r'<?xmlversion="1.0"encoding="UTF-8"standalone="yes"?><neuropacsorderID="TEST"date="2023-12-15"product="TEST"><resultname="PDprobability"value="62.6"/><resultname="MSAprobability"value="85.6"/><dataname="FWpSN"value="0.26"/><dataname="FWPutamen"value="0.19"/><dataname="FWSCP"value="0.48"/><dataname="FWMCP"value="0.07"/></neuropacs>')
+        self.assertEqual(re.sub(r'\s', '', job_results), expected_result_full)
         self.assertIsInstance(job_results, str, "Job results should be a string XML")
         ### TEST JOB RESULTS ###
 
