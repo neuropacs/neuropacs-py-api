@@ -1,8 +1,8 @@
 import neuropacs
 
 def main():
-    api_key = "m0ig54amrl87awtwlizcuji2bxacjm"
-    server_url = "http://localhost:5000"
+    api_key = "your_api_key"
+    server_url = "http://your_server_url:5000"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "TXT"
 
