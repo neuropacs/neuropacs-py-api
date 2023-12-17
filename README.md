@@ -1,3 +1,5 @@
+[![Unit Tests](https://github.com/neuropacs/neuropacs-py-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-sdk/actions/workflows/ci.yml)
+
 # NeuroPACS Python SDK
 
 Connect to NeuroPACS diagnostic capabilities with our Python SDK.
