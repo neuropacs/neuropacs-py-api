@@ -2,7 +2,7 @@ import unittest
 import re
 import json
 from neuropacs.sdk import Neuropacs
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # RUN TESTS: python -m unittest tests.tests_neuropacs
@@ -22,8 +22,8 @@ Test Scenarios
     - success X
     - invalid connection id X
 - upload 
-    - path success X
-    - bytes success X
+    - File object success X
+    - Uint8Array success X
 - upload dataset 
     - dataset path success X
 - run job
@@ -41,8 +41,8 @@ Test Scenarios
         - JSON X
         - XML X
     - invalid result format X
-    - invalid order id 
-    - invalid connection id
+    - invalid order id X
+    - invalid connection id X
 '''
 
 class UnitTests(unittest.TestCase):
@@ -63,7 +63,7 @@ class UnitTests(unittest.TestCase):
         self.assertTrue(aes_key_regex.match(aes_key), "Key should be a valid base64 encoded key")
         ### TEST AES KEY ###
 
-    # Test 2: get_public_key()
+    # Test 2: get_public_key() - Success
     def test_get_public_key(self):
 
         public_key = self.npcs.get_public_key() #Get public key
@@ -87,7 +87,7 @@ class UnitTests(unittest.TestCase):
         ### TEST CONNECTION ID ###
 
     # Test 4: connect() - INVALID API KEY
-    def test_connect_(self):
+    def test_connect_2(self):
         
         aes_key = self.npcs.generate_aes_key() # Generate AES Key
 
@@ -206,15 +206,11 @@ class UnitTests(unittest.TestCase):
 
         product_id = "notARealProduct" # product ID
 
-        # test_dicom_file_path = "./tests/test_dataset/" # Test dataset path
-
         aes_key = self.npcs.generate_aes_key() # Generate AES Key
 
         connection_id = self.npcs.connect(self.api_key, aes_key) # Get connection id
 
         order_id = self.npcs.new_job(connection_id, aes_key) # Create new order
-
-        # self.npcs.upload_dataset(test_dicom_file_path, order_id, connection_id, aes_key) # Upload dataset
 
         with self.assertRaises(Exception) as context:
             job = self.npcs.run_job(product_id, order_id, connection_id, aes_key) # Run job
@@ -228,15 +224,9 @@ class UnitTests(unittest.TestCase):
 
         product_id = "PD/MSA/PSP-v1.0" # product ID
 
-        # test_dicom_file_path = "./tests/test_dataset/" # Test dataset path
-
         aes_key = self.npcs.generate_aes_key() # Generate AES Key
 
         connection_id = self.npcs.connect(self.api_key, aes_key) # Get connection id
-
-        order_id = self.npcs.new_job(connection_id, aes_key) # Create new order
-
-        # self.npcs.upload_dataset(test_dicom_file_path, order_id, connection_id, aes_key) # Upload dataset
 
         with self.assertRaises(Exception) as context:
             job = self.npcs.run_job(product_id, "notARealOrderID", connection_id, aes_key) # Run job
@@ -250,15 +240,11 @@ class UnitTests(unittest.TestCase):
 
         product_id = "PD/MSA/PSP-v1.0" # product ID
 
-        # test_dicom_file_path = "./tests/test_dataset/" # Test dataset path
-
         aes_key = self.npcs.generate_aes_key() # Generate AES Key
 
         connection_id = self.npcs.connect(self.api_key, aes_key) # Get connection id
 
         order_id = self.npcs.new_job(connection_id, aes_key) # Create new order
-
-        # self.npcs.upload_dataset(test_dicom_file_path, order_id, connection_id, aes_key) # Upload dataset
 
         with self.assertRaises(Exception) as context:
             job = self.npcs.run_job(product_id, order_id, "notARealConnectionID", aes_key) # Run job
@@ -343,7 +329,7 @@ class UnitTests(unittest.TestCase):
 
         job_results = self.npcs.get_results("TXT", "TEST", connection_id, aes_key) # Get results
 
-        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         ### TEST JOB RESULTS ###
         self.assertIsInstance(job_results, str, "Job results should be a string")
@@ -365,7 +351,7 @@ class UnitTests(unittest.TestCase):
 
         job_results = self.npcs.get_results("JSON", "TEST", connection_id, aes_key) # Get results
 
-        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         expected_result_pt1 = r'{"orderID":"TEST","date":"'
         expected_result_pt2 = r'","product":"TEST","result":{"PDprobability":"62.6","MSAprobability":"85.6","FWpSN":"0.26","FWPutamen":"0.19","FWSCP":"0.48","FWMCP":"0.07"}}'
         expected_result_full = expected_result_pt1 + current_date + expected_result_pt2
@@ -395,7 +381,7 @@ class UnitTests(unittest.TestCase):
         job_results = self.npcs.get_results("XML", "TEST", connection_id, aes_key) # Get results
 
         expected_result_pt1 = r'<?xmlversion="1.0"encoding="UTF-8"standalone="yes"?><neuropacsorderID="TEST"date="'
-        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         expected_result_pt2 = r'"product="TEST"><resultname="PDprobability"value="62.6"/><resultname="MSAprobability"value="85.6"/><dataname="FWpSN"value="0.26"/><dataname="FWPutamen"value="0.19"/><dataname="FWSCP"value="0.48"/><dataname="FWMCP"value="0.07"/></neuropacs>'
         expected_result_full = expected_result_pt1 + current_date + expected_result_pt2
 
