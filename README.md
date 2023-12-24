@@ -36,10 +36,12 @@ order_id = npcs.new_job()
 
 #UPLOAD AN IMAGE
 # --> data must be a valid path <String> or byte array <Bytes>
+# --> order_id param is optional
 upload_status = npcs.upload(data)
 
 #UPLOAD A DATASET
 # --> dataset_path must be a valid path to a dataset <String>
+# --> order_id param is optional
 upload_status = npcs.upload_dataset(dataset_path)
 
 #START A JOB
