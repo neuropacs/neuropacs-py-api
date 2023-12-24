@@ -1,4 +1,5 @@
 import neuropacs
+# from neuropacs.sdk import Neuropacs
 
 def main():
     # api_key = "your_api_key"
@@ -14,32 +15,23 @@ def main():
     # INITIALIZE NEUROPACS SDK
     npcs = neuropacs.init(api_key, server_url)
 
-    # # GENERATE AN AES KEY
-    # aes_key = npcs.generate_aes_key()
-    # print(f"aes_key: {aes_key}")
+    # CREATE A CONNECTION   
+    connection = npcs.connect()
 
-    # # CONNECT TO NEUROPACS
-    # connection_id = npcs.connect(api_key, aes_key)
-    # print(f"connection_id: {connection_id}")
+    # CREATE A NEW JOB
+    order_id = npcs.new_job()
 
+    # UPLOAD A DATASET
+    npcs.upload_dataset("../dicom_examples/06_001")
 
-    # # CREATE A NEW JOB
-    # order_id = npcs.new_job(connection_id, aes_key)
-    # print(f"order_id: {order_id}")
-
-    # # UPLOAD AN IMAGE
-    # npcs.upload_dataset("../dicom_examples/06_001",order_id,connection_id, aes_key)
-
-    # # START A JOB
-    # job = npcs.run_job(product_id, order_id, connection_id, aes_key)
-    # print(job)
+    # START A JOB
+    job = npcs.run_job(product_id)
 
     # CHECK STATUS
-    status = npcs.check_status("1omtzU4soDVzwD78wKmg", "72d4b2b80b0e1deca33dea009064e86d" , "t43jc/WqeR0PLAR4XsMGKQ==")
-    print(status)
+    status = npcs.check_status()
 
     # GET RESULTS
-    # results = npcs.get_results(result_format, order_id, connection_id, aes_key)
+    results = npcs.get_results(result_format)
 
 
 main()

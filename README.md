@@ -28,33 +28,33 @@ version = neuropacs.PACKAGE_VERSION
 #INITIALIZE NEUROPACS SDK
 npcs = neuropacs.init(server_url)
 
-#GENERATE AN AES KEY
-aes_key = npcs.generate_aes_key()
-
 #CONNECT TO NEUROPACS
-connection_id = npcs.connect(api_key, aes_key)
+connection = npcs.connect()
 
 #CREATE A NEW JOB
-order_id = npcs.new_job(connection_id, aes_key)
+order_id = npcs.new_job()
 
 #UPLOAD AN IMAGE
 # --> data must be a valid path <String> or byte array <Bytes>
-upload_status = npcs.upload(data, order_id, connection_id, aes_key)
+upload_status = npcs.upload(data)
 
 #UPLOAD A DATASET
 # --> dataset_path must be a valid path to a dataset <String>
-upload_status = npcs.upload_dataset(dataset_path,connection_id, order_id, aes_key)
+upload_status = npcs.upload_dataset(dataset_path)
 
 #START A JOB
 # --> Valid product_id options: PD/MSA/PSP-v1.0
-job_start_status = npcs.run_job(connection_id, aes_key, product_id, order_id)
+# --> order_id param is optional
+job_start_status = npcs.run_job(product_id)
 
 #CHECK JOB STATUS
-job_status = npcs.check_status(order_id, connection_id, aes_key)
+# --> order_id param is optional
+job_status = npcs.check_status()
 
 #RETRIEVE JOB RESULTS
 # --> Valid prediction_format options: TXT, PDF, XML, JSON, DICOMSR
-job_results = npcs.get_results(prediction_format, order_id, connection_id, aes_key)
+# --> order_id param is optional
+job_results = npcs.get_results(prediction_format)
 ```
 
 ## Authors
