@@ -252,7 +252,7 @@ class Neuropacs:
                 current_datetime = datetime.now()
                 formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
                 return {
-                    "timestamp": formatted_datetime,
+                    "timestamp": formatted_datetime + " UTC",
                     "connection_id": connection_id,
                     "aes_key": self.aes_key,
                 }

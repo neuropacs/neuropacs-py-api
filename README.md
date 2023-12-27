@@ -26,7 +26,7 @@ prediction_format = "XML"
 version = neuropacs.PACKAGE_VERSION
 
 #INITIALIZE NEUROPACS SDK
-npcs = neuropacs.init(server_url)
+npcs = neuropacs.init(server_url, api_key)
 
 #CONNECT TO NEUROPACS
 connection = npcs.connect()

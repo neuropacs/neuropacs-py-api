@@ -7,31 +7,32 @@ def main():
     # server_url = "http://your_server_url:5000"
     server_url = "http://ec2-3-142-212-32.us-east-2.compute.amazonaws.com:5000"
     product_id = "PD/MSA/PSP-v1.0"
-    result_format = "TXT"
+    result_format = "JSON"
 
     # PRINT CURRENT VERSION
     version = neuropacs.PACKAGE_VERSION
 
     # INITIALIZE NEUROPACS SDK
-    npcs = neuropacs.init(api_key, server_url)
+    npcs = neuropacs.init(server_url, api_key)
 
     # CREATE A CONNECTION   
     connection = npcs.connect()
 
-    # CREATE A NEW JOB
-    order_id = npcs.new_job()
+    # # CREATE A NEW JOB
+    # order_id = npcs.new_job()
 
-    # UPLOAD A DATASET
-    npcs.upload_dataset("../dicom_examples/06_001")
+    # # UPLOAD A DATASET
+    # npcs.upload_dataset("../dicom_examples/06_001")
 
-    # START A JOB
-    job = npcs.run_job(product_id)
+    # # START A JOB
+    # job = npcs.run_job(product_id)
 
     # CHECK STATUS
-    status = npcs.check_status()
+    # status = npcs.check_status()
 
     # GET RESULTS
-    results = npcs.get_results(result_format)
+    results = npcs.get_results(result_format, "TEST")
+    print(results)
 
 
 main()
