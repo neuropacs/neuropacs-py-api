@@ -16,23 +16,22 @@ def main():
     npcs = neuropacs.init(server_url, api_key)
 
     # CREATE A CONNECTION   
-    connection = npcs.connect()
+    npcs.connect()
 
-    # # CREATE A NEW JOB
-    # order_id = npcs.new_job()
+    # CREATE A NEW JOB
+    npcs.new_job()
 
-    # # UPLOAD A DATASET
-    # npcs.upload_dataset("../dicom_examples/06_001")
+    # UPLOAD A DATASET
+    npcs.upload_dataset("../dicom_examples/06_001")
 
-    # # START A JOB
-    # job = npcs.run_job(product_id)
+    # START A JOB
+    job = npcs.run_job(product_id)
 
     # CHECK STATUS
-    # status = npcs.check_status()
+    status = npcs.check_status()
 
     # GET RESULTS
-    results = npcs.get_results(result_format, "TEST")
-    print(results)
+    results = npcs.get_results(result_format)
 
 
 main()
