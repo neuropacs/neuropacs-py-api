@@ -45,6 +45,9 @@ Test Scenarios
     - invalid connection id X
 '''
 
+# SET THIS TO FALSE BEFORE PUSHING TO GITHUB
+test_env = False
+
 test_log_path = ''
 
 test_results = {}
@@ -53,63 +56,65 @@ start_time = 0
 end_time = 0
 
 def log_test(description, input_data, expected_output, actual_output):
-    log_message = """
-Test Description: {description}
+    if test_env:
+        log_message = """
+    Test Description: {description}
 
-    Input:
-    {input_data}
+        Input:
+        {input_data}
 
-    Expected Output:
-    {expected_output}
+        Expected Output:
+        {expected_output}
 
-    Actual Output:
-    {actual_output}
-----------------------------------------------------------------------""".format(
-        description=description,
-        input_data=str(input_data),
-        expected_output=str(expected_output),
-        actual_output=str(actual_output)
-    )
+        Actual Output:
+        {actual_output}
+    ----------------------------------------------------------------------""".format(
+            description=description,
+            input_data=str(input_data),
+            expected_output=str(expected_output),
+            actual_output=str(actual_output)
+        )
 
-    with open(test_log_path, 'a') as file:
-        file.write(log_message)
-        file.close()
+        with open(test_log_path, 'a') as file:
+            file.write(log_message)
+            file.close()
 
 def log_result(status, fail_desc=None):
-    status_message = f"""
-Test result: {status}\n"""
-    if fail_desc is not None:
-        status_message += f"""
-Description: {fail_desc}\n\n"""
-    else:
-        status_message += "\n\n"
+    if test_env: 
+        status_message = f"""
+    Test result: {status}\n"""
+        if fail_desc is not None:
+            status_message += f"""
+    Description: {fail_desc}\n\n"""
+        else:
+            status_message += "\n\n"
 
-    with open(test_log_path, 'a') as file:
-        file.write(status_message)
-        file.close()
+        with open(test_log_path, 'a') as file:
+            file.write(status_message)
+            file.close()
 
 def log_test_results():
-    total_tests = 0
-    passed_tests = 0
+    if test_env:
+        total_tests = 0
+        passed_tests = 0
 
-    with open(test_log_path, 'a') as file:
-        for test in test_results:
-            if test_results[test] == "PASS":
-                result_str = f"O - {test}"
-                passed_tests += 1
-                total_tests += 1
-            elif test_results[test] == "FAIL":
-                result_str = f"X - {test}"
-                total_tests += 1
-            file.write(result_str + "\n")
-        test_score_str = f"""
-Test Suites: {1} passed, {1} total
-Tests: {passed_tests} passed, {total_tests} total
-Ran all test suites in {end_time-start_time}s.
-"""
-        file.write(test_score_str)
-        file.close()
-    
+        with open(test_log_path, 'a') as file:
+            for test in test_results:
+                if test_results[test] == "PASS":
+                    result_str = f"O - {test}"
+                    passed_tests += 1
+                    total_tests += 1
+                elif test_results[test] == "FAIL":
+                    result_str = f"X - {test}"
+                    total_tests += 1
+                file.write(result_str + "\n")
+            test_score_str = f"""
+    Test Suites: {1} passed, {1} total
+    Tests: {passed_tests} passed, {total_tests} total
+    Ran all test suites in {end_time-start_time}s.
+    """
+            file.write(test_score_str)
+            file.close()
 
 
 def is_valid_public_key(base64_pem_key):
@@ -143,25 +148,25 @@ class UnitTests(unittest.TestCase):
         
     @classmethod
     def setUpClass(cls):
-        global start_time
-        start_time = time.time()
-        current_date = datetime.utcnow()
-        formatted_utc_string = current_date.strftime("%m-%d-%yT%H-%M-%S")
-        file_path = f"./tests/test_logs/unittest_{formatted_utc_string}.log"
-        global test_log_path
-        test_log_path = file_path
-
-        titleMessage = f"Python SDK Unit Tests\nTest run date: {formatted_utc_string}\n\n"
-
-        with open(test_log_path, 'a') as file:
-            file.write(titleMessage)
-            file.close()
+        if test_env:
+            global start_time
+            start_time = time.time()
+            current_date = datetime.utcnow()
+            formatted_utc_string = current_date.strftime("%m-%d-%yT%H-%M-%S")
+            file_path = f"./tests/test_logs/unittest_{formatted_utc_string}.log"
+            global test_log_path
+            test_log_path = file_path
+            titleMessage = f"Python SDK Unit Tests\nTest run date: {formatted_utc_string}\n\n"
+            with open(test_log_path, 'a') as file:
+                file.write(titleMessage)
+                file.close()
 
     @classmethod
     def tearDownClass(cls):
-        global end_time
-        end_time = time.time()
-        log_test_results()
+        if test_env:
+            global end_time
+            end_time = time.time()
+            log_test_results()
         
     # Test 1: get_public_key() - Success
     def test_get_public_key(self):
