@@ -65,7 +65,7 @@ Kerrick Cavanaugh - kerrick@neuropacs.com
 
 ## Version History
 
-- 1.3.6
+- 1.3.9
   - Initial Release
   - See [release history](https://pypi.org/project/neuropacs/#history)
 

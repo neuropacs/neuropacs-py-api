@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='neuropacs',
-    version='1.3.8',
+    version='1.3.9',
     description='NeuroPACS Python SDK',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -38,8 +38,6 @@ setup(
         'Programming Language :: Python :: 3',
     ],
 )
-
-
 
 # To update this SDK:
 # 1. Remove /build /dist /neuropacs.egg-info

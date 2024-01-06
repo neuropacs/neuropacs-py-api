@@ -10,7 +10,7 @@ def main():
     result_format = "JSON"
 
     # PRINT CURRENT VERSION
-    version = neuropacs.PACKAGE_VERSION
+    # version = neuropacs.PACKAGE_VERSION
 
     # INITIALIZE NEUROPACS SDK
     npcs = neuropacs.init(server_url, api_key)
@@ -19,19 +19,23 @@ def main():
     npcs.connect()
 
     # CREATE A NEW JOB
-    npcs.new_job()
+    order = npcs.new_job()
+    print(order)
+
 
     # UPLOAD A DATASET
     npcs.upload_dataset("../dicom_examples/06_001")
 
     # START A JOB
     job = npcs.run_job(product_id)
+    print(job)
 
     # CHECK STATUS
-    status = npcs.check_status()
+    # status = npcs.check_status("jfuyKl0orwUUhPmB3e2S")
+    # print(status)
 
     # GET RESULTS
-    results = npcs.get_results(result_format)
+    # results = npcs.get_results(result_format)
 
 
 main()
