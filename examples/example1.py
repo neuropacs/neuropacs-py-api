@@ -1,5 +1,4 @@
-# import neuropacs
-from neuropacs.sdk import Neuropacs
+import neuropacs
 
 def main():
     # api_key = "your_api_key"
@@ -11,35 +10,28 @@ def main():
 
 
     # PRINT CURRENT VERSION
-    # version = neuropacs.PACKAGE_VERSION
-    npcs = Neuropacs(server_url, api_key)
+    version = neuropacs.PACKAGE_VERSION
 
     # INITIALIZE NEUROPACS SDK
-    # npcs = neuropacs.init(server_url, api_key)
+    npcs = neuropacs.init(server_url, api_key)
 
     # CREATE A CONNECTION   
     conn = npcs.connect()
-    print(conn)
 
     # CREATE A NEW JOB
     order = npcs.new_job()
-    print(order)
 
-    # # # UPLOAD A DATASET
+    # UPLOAD A DATASET
     datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small")
-    print(datasetID)
 
-    # # # START A JOB
-    # job = npcs.run_job(product_id)
-    # print(job)
+    # START A JOB
+    job = npcs.run_job(product_id)
 
-    # # # CHECK STATUS
-    # status = npcs.check_status("TEST")
-    # print(status)
+    # CHECK STATUS
+    status = npcs.check_status("TEST")
 
-    # # GET RESULTS
-    # results = npcs.get_results(result_format, "TEST")
-    # print(results)
+    # GET RESULTS
+    results = npcs.get_results(result_format, "TEST")
 
 
 main()
