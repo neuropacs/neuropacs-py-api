@@ -32,6 +32,7 @@ class Neuropacs:
         self.__setup_socket_events()
         self.ack_recieved = False
         self.dataset_upload = False
+        self.ackDatasetID = ""
         self.files_uploaded = 0
 
 
@@ -49,12 +50,14 @@ class Neuropacs:
     #     print('Upload socket disconnected.')
 
     def __on_socket_ack(self, data):
-        if data == "0":
-            self.ack_recieved = True
-            self.files_uploaded += 1
-        else:
+        if data == "1":
             self.__disconnect_from_socket()
-            raise Exception({"neuropacsError": "Upload failed on server side, ending upload process."})    
+            raise Exception({"neuropacsError": "Upload failed on server side, ending upload process."})  
+        else:
+            self.ack_recieved = True
+            self.ackDatasetID = data
+            self.files_uploaded += 1
+  
             
     def __disconnect_from_socket(self):
         self.sio.disconnect()
@@ -316,7 +319,8 @@ class Neuropacs:
                         prog_bar.update(1)  # Update the outer progress bar for each file
     
             self.__disconnect_from_socket()
-            return 201  
+
+            return self.ackDatasetID
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
                 raise e.args[0]['neuropacsError'] 
@@ -403,6 +407,7 @@ class Neuropacs:
 
             if not self.dataset_upload:
                 self.__disconnect_from_socket()
+                return self.ackDatasetID
 
             return 201
                 
@@ -433,6 +438,7 @@ class Neuropacs:
 
                 if not self.dataset_upload:
                     self.__disconnect_from_socket()
+                    return self.ackDatasetID
 
                 return 201
 

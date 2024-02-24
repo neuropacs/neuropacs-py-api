@@ -21,24 +21,25 @@ def main():
     conn = npcs.connect()
     print(conn)
 
-    # # CREATE A NEW JOB
-    # order = npcs.new_job()
-    # print(order)
+    # CREATE A NEW JOB
+    order = npcs.new_job()
+    print(order)
 
     # # # UPLOAD A DATASET
-    # npcs.upload_dataset("../dicom_examples/DICOM_small")
+    datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small")
+    print(datasetID)
 
     # # # START A JOB
     # job = npcs.run_job(product_id)
     # print(job)
 
-    # # CHECK STATUS
-    status = npcs.check_status("TEST")
-    print(status)
+    # # # CHECK STATUS
+    # status = npcs.check_status("TEST")
+    # print(status)
 
-    # GET RESULTS
-    results = npcs.get_results(result_format, "TEST")
-    print(results)
+    # # GET RESULTS
+    # results = npcs.get_results(result_format, "TEST")
+    # print(results)
 
 
 main()
