@@ -18,12 +18,13 @@ from cryptography.hazmat.primitives import serialization
 import requests
 
 class Neuropacs:
-    def __init__(self, server_url, api_key):
+    def __init__(self, server_url, api_key, client="api"):
         """
         NeuroPACS constructor
         """
         self.server_url = server_url
         self.api_key = api_key
+        self.client = client
         self.aes_key = self.__generate_aes_key()
         self.connection_id = ""
         self.aes_key = ""
@@ -52,9 +53,9 @@ class Neuropacs:
             self.ack_recieved = True
             self.files_uploaded += 1
         else:
-            print("Upload failed on server side, ending upload process.")
             self.__disconnect_from_socket()
-
+            raise Exception({"neuropacsError": "Upload failed on server side, ending upload process."})    
+            
     def __disconnect_from_socket(self):
         self.sio.disconnect()
 
@@ -84,7 +85,7 @@ class Neuropacs:
             plaintext = json.dumps(plaintext)
         except:
             if not isinstance(plaintext, str):
-                raise Exception("Plaintext must be a string or JSON!")    
+                raise Exception({"neuropacsError": "Plaintext must be a string or JSON!"})    
 
     
         # get public key of server
@@ -130,9 +131,12 @@ class Neuropacs:
                 plaintext_json = json.dumps(plaintext)
                 plaintext_bytes = plaintext_json.encode("utf-8")
             else:
-                raise Exception("Invalid plaintext format!")
+                raise Exception({"neuropacsError": "Invalid plaintext format!"})
         except Exception as e:
-            raise Exception("Invalid plaintext format!")
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:   
+                raise Exception("Invalid plaintext format!")
 
         try:
             aes_key_bytes = base64.b64decode(self.aes_key)
@@ -160,8 +164,11 @@ class Neuropacs:
 
             return encryped_message
 
-        except:
-            raise Exception("AES encryption failed!")   
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:
+                raise Exception("AES encryption failed!")   
 
     def __decrypt_aes_ctr(self, encrypted_data, format_out):
         """AES CTR decrypt ciphertext.
@@ -198,8 +205,11 @@ class Neuropacs:
                 pass
 
             return decrypted_data
-        except:
-            raise RuntimeError("AES decryption failed!")
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:
+                raise Exception("AES decryption failed!")
     
     def __generate_filename(self):
         """Generate a filename for byte data
@@ -214,50 +224,64 @@ class Neuropacs:
 
         :return: Base64 string public key.
         """
-        res = requests.get(f"{self.server_url}/getPubKey")
-        if(res.status_code != 200):
-            raise Exception(f"Public key retrieval failed!")
-            
-        json = res.json()
-        pub_key = json['pub_key']
-        return pub_key
+        try:
+            res = requests.get(f"{self.server_url}/api/getPubKey")
 
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
+
+            json = res.json()
+            pub_key = json['pub_key']
+            return pub_key
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:
+                raise Exception("Public key retrieval failed.")
+            
+            
     def connect(self):
         """Create a connection with the server
 
         Returns:
         :returns: Connection object (timestamp, connection_id, order_id)
         """
+        try:
+            headers = {
+            'Content-Type': 'text/plain',
+            'client': self.client
+            }
 
-        headers = {
-        'Content-Type': 'text/plain',
-        'client': 'api'
-        }
+            self.aes_key = self.__generate_aes_key()
 
-        self.aes_key = self.__generate_aes_key()
+            body = {
+                "aes_key": self.aes_key,
+                "api_key": self.api_key
+            }
 
-        body = {
-            "aes_key": self.aes_key,
-            "api_key": self.api_key
-        }
+            encrypted_body = self.__oaep_encrypt(body)
 
-        encrypted_body = self.__oaep_encrypt(body)
+            res = requests.post(f"{self.server_url}/api/connect/", data=encrypted_body, headers=headers)
 
-        res = requests.post(f"{self.server_url}/connect/", data=encrypted_body, headers=headers)
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
 
-        if res.status_code == 200:
-                json = res.json()
-                connection_id = json["connectionID"]
-                self.connection_id = connection_id
-                current_datetime = datetime.now()
-                formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                return {
-                    "timestamp": formatted_datetime + " UTC",
-                    "connection_id": connection_id,
-                    "aes_key": self.aes_key,
-                }
-        else:
-            raise Exception(f"Connection failed!")
+            json = res.json()
+            connection_id = json["connectionID"]
+            self.connection_id = connection_id
+            current_datetime = datetime.now()
+            formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            return {
+                "timestamp": formatted_datetime + " UTC",
+                "connection_id": connection_id,
+                "aes_key": self.aes_key,
+            }
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:
+                raise Exception("Connection failed.")
+            
 
 
     def upload_dataset(self, directory, order_id=None):
@@ -268,30 +292,37 @@ class Neuropacs:
 
         :return: Upload status code.
         """
+        try:
+    
+            if order_id == None:
+                order_id = self.order_id
 
-        if order_id == None:
-            order_id = self.order_id
+            self.dataset_upload = True
+            self.__connect_to_socket()
 
-        self.dataset_upload = True
-        self.__connect_to_socket()
+            if isinstance(directory,str):
+                if not os.path.isdir(directory):
+                    raise Exception({"neuropacsError": "Path not a directory!"}) 
+            else:
+                raise Exception({"neuropacsError": "Path must be a string!"}) 
 
-        if isinstance(directory,str):
-            if not os.path.isdir(directory):
-                raise Exception("Path not a directory!") 
-        else:
-            raise Exception("Path must be a string!") 
+            total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
 
-        total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
+            with tqdm(total=total_files, desc="Uploading", unit="file") as prog_bar:
+                for dirpath, _, filenames in os.walk(directory):
+                    for filename in filenames:
+                        file_path = os.path.join(dirpath, filename)
+                        self.upload(file_path, order_id)
+                        prog_bar.update(1)  # Update the outer progress bar for each file
+    
+            self.__disconnect_from_socket()
+            return 201  
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise e.args[0]['neuropacsError'] 
+            else:
+                raise Exception("Dataset upload failed.")
 
-        with tqdm(total=total_files, desc="Uploading", unit="file") as prog_bar:
-            for dirpath, _, filenames in os.walk(directory):
-                for filename in filenames:
-                    file_path = os.path.join(dirpath, filename)
-                    self.upload(file_path, order_id)
-                    prog_bar.update(1)  # Update the outer progress bar for each file
- 
-        self.__disconnect_from_socket()
-        return 201   
 
     def upload(self, data, order_id=None):
         """Upload a file to the server
@@ -320,9 +351,9 @@ class Neuropacs:
                 directories = normalized_path.split(os.sep)
                 filename = directories[-1]
             else:
-                raise Exception("Path not a file!")
+                raise Exception({"neuropacsError": "Path not a file!"})
         else:
-            raise Exception("Unsupported data type!")
+            raise Exception({"neuropacsError": "Unsupported data type!"})
 
         form = {
             "Content-Disposition": "form-data",
@@ -355,7 +386,7 @@ class Neuropacs:
             message = header_bytes + encrypted_binary_data + END.encode("utf-8")
 
             headers = {
-            "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': 'API', 'order-id': encrypted_order_id
+            "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
             }
 
             self.sio.emit('file_data', {'data': message, 'headers': headers})
@@ -368,7 +399,7 @@ class Neuropacs:
 
             if elapsed_time > max_ack_wait_time:
                 self.__disconnect_from_socket()
-                raise Exception(f"Upload timeout!")
+                raise Exception({"neuropacsError" : f"Upload timeout!"})
 
             if not self.dataset_upload:
                 self.__disconnect_from_socket()
@@ -384,7 +415,7 @@ class Neuropacs:
                 message = header_bytes + encrypted_binary_data + END.encode("utf-8")
 
                 headers = {
-                "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': 'API', 'order-id': encrypted_order_id
+                "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
                 }
 
                 self.sio.emit('file_data', {'data': message, 'headers': headers})
@@ -398,7 +429,7 @@ class Neuropacs:
 
                 if elapsed_time > max_ack_wait_time:
                     self.__disconnect_from_socket()
-                    raise Exception(f"Upload timeout!")
+                    raise Exception({"neuropacsError": f"Upload timeout!"})
 
                 if not self.dataset_upload:
                     self.__disconnect_from_socket()
@@ -411,17 +442,23 @@ class Neuropacs:
 
         :return: Base64 string order_id.
         """
-        headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': 'API'}
+        try:
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
-        res = requests.post(f"{self.server_url}/newJob/", headers=headers)
+            res = requests.post(f"{self.server_url}/api/newJob/", headers=headers)
 
-        if res.status_code == 201:
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
+
             text = res.text
             decrypted_text = self.__decrypt_aes_ctr(text, "string")
             self.order_id = decrypted_text
             return decrypted_text
-        else:
-            raise Exception(f"Job creation failed!")
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise Exception(e.args[0]['neuropacsError'])
+            else:
+                raise Exception("Job creation failed.")            
 
 
     def run_job(self, product_id, order_id=None):
@@ -432,55 +469,73 @@ class Neuropacs:
         
         :return: Job run status code.
         """
+        try:
+            if order_id == None:
+                order_id = self.order_id
 
-        if order_id == None:
-            order_id = self.order_id
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
-        headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': 'api'}
+            body = {
+                'orderID': order_id,
+                'productID': product_id
+            }
 
-        body = {
-            'orderID': order_id,
-            'productID': product_id
-        }
+            encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
-        encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
+            res = requests.post(f"{self.server_url}/api/runJob/", data=encryptedBody, headers=headers)
+            
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
 
-        res = requests.post(f"{self.server_url}/runJob/", data=encryptedBody, headers=headers)
-        if res.status_code == 202:
             return res.status_code
-        else:
-            raise RuntimeError("Job run failed.")
+                
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise Exception(e.args[0]['neuropacsError'])
+            else:
+                raise Exception("Job run failed.")  
 
 
-    def check_status(self, order_id=None):
+    def check_status(self, order_id=None, dataset_id=None):
         """Check job status
 
-        :prarm str order_id: Base64 order_id (optional)
+        :param str order_id: Base64 order_id (optional)
+        :param str dataset_id: Base64 dataset_id (optional)
         
         :return: Job status message.
         """
 
-        if order_id == None:
-            order_id = self.order_id
+        try:
+            if order_id == None:
+                order_id = self.order_id
 
-        headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': 'api'}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
-        body = {
-            'orderID': order_id,
-        }
+            body = {
+                'orderID': order_id,
+                'datasetID': dataset_id
+            }
 
-        encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
+            encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
-        res = requests.post(f"{self.server_url}/checkStatus/", data=encryptedBody, headers=headers)
-        if res.status_code == 200:
+            res = requests.post(f"{self.server_url}/api/checkStatus/", data=encryptedBody, headers=headers)
+            
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
+            
             text = res.text
             json = self.__decrypt_aes_ctr(text, "json")
             return json
-        else:
-            raise RuntimeError("Status check failed.")
+            
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise Exception(e.args[0]['neuropacsError'])
+            else:
+                raise Exception("Status check failed.")  
+            
 
 
-    def get_results(self, format, order_id=None):
+    def get_results(self, format, order_id=None, dataset_id=None):
         """Get job results
 
         :param str format: Format of file data
@@ -488,31 +543,39 @@ class Neuropacs:
 
         :return: AES encrypted file data in specified format
         """
+        try:
+            if order_id == None:
+                order_id = self.order_id
 
-        if order_id == None:
-            order_id = self.order_id
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
-        headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': 'api'}
+            body = {
+                'orderID': order_id,
+                'format': format,
+                'datasetID': dataset_id
+            }
 
-        body = {
-            'orderID': order_id,
-            'format': format
-        }
+            validFormats = ["TXT", "XML", "JSON", "PDF", "DCM"]
 
-        validFormats = ["TXT", "XML", "JSON"]
+            if format not in validFormats:
+                raise Exception({"neuropacsError" : "Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PDF\", \"DCM\" ."})
 
-        if format not in validFormats:
-            raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\".")
+            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
-        encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+            res = requests.post(f"{self.server_url}/api/getResults/", data=encrypted_body, headers=headers)
+            
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
 
-        res = requests.post(f"{self.server_url}/getResults/", data=encrypted_body, headers=headers)
-        
-        if res.status_code == 200:
             text = res.text
             decrypted_file_data = self.__decrypt_aes_ctr(text, "string")
             return decrypted_file_data
-        else:
-            raise Exception(f"Result retrieval failed!")
+
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise Exception(e.args[0]['neuropacsError'])
+            else:
+                raise Exception(f"Result retrieval failed!")
+
 
     
