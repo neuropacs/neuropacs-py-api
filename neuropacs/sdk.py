@@ -9,7 +9,9 @@ import secrets
 from datetime import datetime
 import time
 from tqdm import tqdm
-import socketio
+import asyncio
+import websockets
+# import socketio
 from Crypto.Cipher import AES
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -18,7 +20,7 @@ from cryptography.hazmat.primitives import serialization
 import requests
 
 class Neuropacs:
-    def __init__(self, server_url, api_key, client="api"):
+    def __init__(self, server_url, socket_url, api_key, client="api"):
         """
         NeuroPACS constructor
         """
@@ -28,43 +30,44 @@ class Neuropacs:
         self.aes_key = self.__generate_aes_key()
         self.connection_id = ""
         self.aes_key = ""
-        self.sio = socketio.Client()
-        self.__setup_socket_events()
+        self.websocket = None
+        # self.sio = socketio.Client()
+        self.socket_url = socket_url
+        # self.__setup_socket_events()
         self.ack_recieved = False
         self.dataset_upload = False
         self.ackDatasetID = ""
         self.files_uploaded = 0
 
 
-    def __setup_socket_events(self):
-        # self.sio.on('connect', self.on_socket_connect)
-        self.sio.on('ack', self.__on_socket_ack)
-        # self.sio.on('disconnect', self.on_socket_disconnect)
+    async def __connect_to_socket(self):
+        """
+        Connect to WebSocket server.
+        """
+        self.websocket = await websockets.connect(self.socket_url)
+        # print("Connected to WebSocket server")
 
-    # @staticmethod
-    # def __on_socket_connect(self):
-    #     print('Upload socket connected.')
+    async def __send_ws_message(self, message):
+        """
+        Send a message through the WebSocket connection.
+        """
+        await self.websocket.send(json.dumps(message))
 
-    # @staticmethod
-    # def __on_socket_disconnect(self):
-    #     print('Upload socket disconnected.')
-
-    def __on_socket_ack(self, data):
-        if data == "1":
-            self.__disconnect_from_socket()
-            raise Exception({"neuropacsError": "Upload failed on server side, ending upload process."})  
+    async def __receive_ws_message(self):
+        """
+        Receive a message from the WebSocket connection.
+        """
+        try:
+            # Wait for a message with a timeout
+            response = await asyncio.wait_for(self.websocket.recv(), 10)
+        except asyncio.TimeoutError:
+            raise Exception({"neuropacsError" : f"Upload timeout."})
+        json_response = json.loads(response)
+        if json_response['ack'] == '1':
+            raise Exception({"neuropacsError" : f"Upload failed."})
         else:
-            self.ack_recieved = True
-            self.ackDatasetID = data
-            self.files_uploaded += 1
-  
-            
-    def __disconnect_from_socket(self):
-        self.sio.disconnect()
+            self.ackDatasetID = json_response['ack']
 
-    def __connect_to_socket(self):
-        self.ack_recieved = False
-        self.sio.connect(self.server_url, transports='websocket')
 
     def __generate_aes_key(self):
         """Generate an 16-byte AES key for AES-CTR encryption.
@@ -137,7 +140,7 @@ class Neuropacs:
                 raise Exception({"neuropacsError": "Invalid plaintext format!"})
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError'])
             else:   
                 raise Exception("Invalid plaintext format!")
 
@@ -169,7 +172,7 @@ class Neuropacs:
 
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("AES encryption failed!")   
 
@@ -210,7 +213,7 @@ class Neuropacs:
             return decrypted_data
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("AES decryption failed!")
     
@@ -238,7 +241,7 @@ class Neuropacs:
             return pub_key
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("Public key retrieval failed.")
             
@@ -281,13 +284,13 @@ class Neuropacs:
             }
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("Connection failed.")
             
 
 
-    def upload_dataset(self, directory, order_id=None):
+    async def upload_dataset(self, directory, order_id=None):
         """Upload a dataset to the server
 
         :param str directory: Path to dataset folder to be uploaded.
@@ -301,7 +304,8 @@ class Neuropacs:
                 order_id = self.order_id
 
             self.dataset_upload = True
-            self.__connect_to_socket()
+
+            await self.__connect_to_socket()
 
             if isinstance(directory,str):
                 if not os.path.isdir(directory):
@@ -315,20 +319,20 @@ class Neuropacs:
                 for dirpath, _, filenames in os.walk(directory):
                     for filename in filenames:
                         file_path = os.path.join(dirpath, filename)
-                        self.upload(file_path, order_id)
+                        await self.upload(file_path, order_id)
                         prog_bar.update(1)  # Update the outer progress bar for each file
     
-            self.__disconnect_from_socket()
-
+            await self.websocket.close()
+            
             return self.ackDatasetID
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise e.args[0]['neuropacsError'] 
+                raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("Dataset upload failed.")
 
 
-    def upload(self, data, order_id=None):
+    async def upload(self, data, order_id=None):
         """Upload a file to the server
 
         :param str/bytes data: Path of file to be uploaded or byte array
@@ -384,63 +388,38 @@ class Neuropacs:
 
         encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
 
+        payload_data = None
+
         if isinstance(data,bytes):
             encrypted_binary_data = self.__encrypt_aes_ctr(data, "bytes","bytes")
 
-            message = header_bytes + encrypted_binary_data + END.encode("utf-8")
-
-            headers = {
-            "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
-            }
-
-            self.sio.emit('file_data', {'data': message, 'headers': headers})
-
-            max_ack_wait_time = 10   #10 seconds
-            start_time = time.time()
-            elapsed_time = 0
-            while (not self.ack_recieved) and (elapsed_time < max_ack_wait_time):
-                elapsed_time = time.time() - start_time
-
-            if elapsed_time > max_ack_wait_time:
-                self.__disconnect_from_socket()
-                raise Exception({"neuropacsError" : f"Upload timeout!"})
-
-            if not self.dataset_upload:
-                self.__disconnect_from_socket()
-                return self.ackDatasetID
-
-            return 201
-                
+            payload_data = header_bytes + encrypted_binary_data + END.encode("utf-8")
+        
         elif isinstance(data,str):
             with open(data, 'rb') as f:
                 binary_data = f.read()
 
                 encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
 
-                message = header_bytes + encrypted_binary_data + END.encode("utf-8")
+                payload_data = header_bytes + encrypted_binary_data + END.encode("utf-8")
 
-                headers = {
-                "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
-                }
 
-                self.sio.emit('file_data', {'data': message, 'headers': headers})
+        headers = {
+        "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
+        }
 
-                max_ack_wait_time = 10   #10 seconds
+        encoded_data = base64.b64encode(payload_data).decode('utf-8')
 
-                start_time = time.time()
-                elapsed_time = 0
-                while (not self.ack_recieved) and (elapsed_time < max_ack_wait_time):
-                    elapsed_time = time.time() - start_time
+        action_payload = {'action': 'upload', 'data': encoded_data, 'headers': headers}
 
-                if elapsed_time > max_ack_wait_time:
-                    self.__disconnect_from_socket()
-                    raise Exception({"neuropacsError": f"Upload timeout!"})
+        await self.__send_ws_message(action_payload)
 
-                if not self.dataset_upload:
-                    self.__disconnect_from_socket()
-                    return self.ackDatasetID
+        await self.__receive_ws_message()
 
-                return 201
+        if not self.dataset_upload:
+            await self.websocket.close()
+
+        return 201
 
 
     def new_job (self):
