@@ -7,11 +7,8 @@ import base64
 import string
 import secrets
 from datetime import datetime
-import time
 from tqdm import tqdm
-import asyncio
-import websockets
-# import socketio
+import hashlib
 from Crypto.Cipher import AES
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -20,7 +17,7 @@ from cryptography.hazmat.primitives import serialization
 import requests
 
 class Neuropacs:
-    def __init__(self, server_url, socket_url, api_key, client="api"):
+    def __init__(self, server_url, api_key, client="api"):
         """
         NeuroPACS constructor
         """
@@ -30,44 +27,8 @@ class Neuropacs:
         self.aes_key = self.__generate_aes_key()
         self.connection_id = ""
         self.aes_key = ""
-        self.websocket = None
-        # self.sio = socketio.Client()
-        self.socket_url = socket_url
-        # self.__setup_socket_events()
-        self.ack_recieved = False
         self.dataset_upload = False
-        self.ackDatasetID = ""
         self.files_uploaded = 0
-
-
-    async def __connect_to_socket(self):
-        """
-        Connect to WebSocket server.
-        """
-        self.websocket = await websockets.connect(self.socket_url)
-        # print("Connected to WebSocket server")
-
-    async def __send_ws_message(self, message):
-        """
-        Send a message through the WebSocket connection.
-        """
-        await self.websocket.send(json.dumps(message))
-
-    async def __receive_ws_message(self):
-        """
-        Receive a message from the WebSocket connection.
-        """
-        try:
-            # Wait for a message with a timeout
-            response = await asyncio.wait_for(self.websocket.recv(), 10)
-        except asyncio.TimeoutError:
-            raise Exception({"neuropacsError" : f"Upload timeout."})
-        json_response = json.loads(response)
-        if json_response['ack'] == '1':
-            raise Exception({"neuropacsError" : f"Upload failed."})
-        else:
-            self.ackDatasetID = json_response['ack']
-
 
     def __generate_aes_key(self):
         """Generate an 16-byte AES key for AES-CTR encryption.
@@ -205,7 +166,7 @@ class Neuropacs:
 
             decrypted_data = decrypted.decode("utf-8")
 
-            if format_out == "JSON":
+            if format_out == "json":
                 decrypted_data = json.loads(decrypted_data)
             elif format_out == "string":
                 pass
@@ -290,7 +251,7 @@ class Neuropacs:
             
 
 
-    async def upload_dataset(self, directory, order_id=None):
+    def upload_dataset(self, directory, order_id=None):
         """Upload a dataset to the server
 
         :param str directory: Path to dataset folder to be uploaded.
@@ -299,13 +260,10 @@ class Neuropacs:
         :return: Upload status code.
         """
         try:
-    
+            self.dataset_upload = True
+            
             if order_id == None:
                 order_id = self.order_id
-
-            self.dataset_upload = True
-
-            await self.__connect_to_socket()
 
             if isinstance(directory,str):
                 if not os.path.isdir(directory):
@@ -313,18 +271,22 @@ class Neuropacs:
             else:
                 raise Exception({"neuropacsError": "Path must be a string!"}) 
 
+            datasetID = os.path.basename(directory)
+            hash_object = hashlib.sha256()
+            hash_object.update(datasetID.encode())
+            hex_dig = hash_object.hexdigest()
+
             total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
 
             with tqdm(total=total_files, desc="Uploading", unit="file") as prog_bar:
                 for dirpath, _, filenames in os.walk(directory):
                     for filename in filenames:
                         file_path = os.path.join(dirpath, filename)
-                        await self.upload(file_path, order_id)
+                        self.upload(file_path, hex_dig, order_id)
                         prog_bar.update(1)  # Update the outer progress bar for each file
-    
-            await self.websocket.close()
             
-            return self.ackDatasetID
+            return hex_dig
+
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
                 raise Exception(e.args[0]['neuropacsError']) 
@@ -332,25 +294,23 @@ class Neuropacs:
                 raise Exception("Dataset upload failed.")
 
 
-    async def upload(self, data, order_id=None):
+    def upload(self, data, datasetID, order_id=None):
         """Upload a file to the server
 
         :param str/bytes data: Path of file to be uploaded or byte array
         :param str order_id: Base64 order_id (optional)
+        :param str presigned_url: Presigned URL for S3 bucket upload
 
         :return: Upload status code.
         """
 
+        # if not self.dataset_upload:
+
         if order_id == None:
             order_id = self.order_id
 
-        self.ack_recieved = False
-
-        if not self.dataset_upload:
-            self.__connect_to_socket()
-
+        # get file name
         filename = ""
-
         if isinstance(data,bytes):
             filename = self.__generate_filename()
         elif isinstance(data,str):
@@ -362,6 +322,22 @@ class Neuropacs:
                 raise Exception({"neuropacsError": "Path not a file!"})
         else:
             raise Exception({"neuropacsError": "Unsupported data type!"})
+
+        # encrypt order ID
+        encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
+
+        # create headers
+        headers = {"Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': datasetID}
+
+        # get s3 upload params
+        res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
+
+        if not res.ok:
+            raise Exception({"neuropacsError": f"{res.text}"})
+
+        decrypted_s3_info = self.__decrypt_aes_ctr(res.text, "json")
+
+        presigned_url = decrypted_s3_info["presignedURL"]
 
         form = {
             "Content-Disposition": "form-data",
@@ -390,37 +366,23 @@ class Neuropacs:
 
         payload_data = None
 
-        if isinstance(data,bytes):
-            encrypted_binary_data = self.__encrypt_aes_ctr(data, "bytes","bytes")
-
-            payload_data = header_bytes + encrypted_binary_data + END.encode("utf-8")
+        if isinstance(data, bytes):
+            # encrypted_binary_data = self.__encrypt_aes_ctr(data, "bytes","bytes")
+            payload_data = header_bytes + data + END.encode("utf-8")
         
         elif isinstance(data,str):
             with open(data, 'rb') as f:
                 binary_data = f.read()
-
-                encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
-
-                payload_data = header_bytes + encrypted_binary_data + END.encode("utf-8")
+                # encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
+                payload_data = header_bytes + binary_data + END.encode("utf-8")
 
 
-        headers = {
-        "Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id
-        }
+        res = requests.put(presigned_url, data=payload_data)
 
-        encoded_data = base64.b64encode(payload_data).decode('utf-8')
-
-        action_payload = {'action': 'upload', 'data': encoded_data, 'headers': headers}
-
-        await self.__send_ws_message(action_payload)
-
-        await self.__receive_ws_message()
-
-        if not self.dataset_upload:
-            await self.websocket.close()
+        if not res.ok:
+            raise Exception({"neuropacsError": f"{res.text}"})
 
         return 201
-
 
     def new_job (self):
         """Create a new order

@@ -3,7 +3,7 @@ import neuropacs
 def main():
     # api_key = "your_api_key"
     api_key = "m0ig54amrl87awtwlizcuji2bxacjm"
-    server_url = "http://ec2-18-218-48-101.us-east-2.compute.amazonaws.com:5000"
+    server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev/"
     # server_url = "http://localhost:5000"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "TXT"
@@ -17,21 +17,24 @@ def main():
 
     # CREATE A CONNECTION   
     conn = npcs.connect()
+    print(conn)
 
-    # CREATE A NEW JOB
+    # # CREATE A NEW JOB
     order = npcs.new_job()
+    print(order)
 
-    # UPLOAD A DATASET
+    # # UPLOAD A DATASET
     datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small")
+    print(datasetID)
 
-    # START A JOB
-    job = npcs.run_job(product_id)
+    # # START A JOB
+    # job = npcs.run_job(product_id)
 
-    # CHECK STATUS
-    status = npcs.check_status("TEST")
+    # # CHECK STATUS
+    # status = npcs.check_status("TEST")
 
-    # GET RESULTS
-    results = npcs.get_results(result_format, "TEST")
+    # # GET RESULTS
+    # results = npcs.get_results(result_format, "TEST")
 
 
 main()
