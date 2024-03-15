@@ -1,8 +1,8 @@
-[![Unit Tests](https://github.com/neuropacs/neuropacs-py-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-sdk/actions/workflows/ci.yml)
+[![Unit Tests](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml)
 
-# NeuroPACS Python SDK
+# NeuroPACS Python API
 
-Connect to NeuroPACS diagnostic capabilities with our Python SDK.
+Connect to neuropacs diagnostic capabilities with our Python API.
 
 ## Getting Started
 
@@ -25,7 +25,7 @@ prediction_format = "XML"
 # PRINT CURRENT VERSION
 version = neuropacs.PACKAGE_VERSION
 
-#INITIALIZE NEUROPACS SDK
+#INITIALIZE NEUROPACS API
 npcs = neuropacs.init(server_url, api_key)
 
 #CONNECT TO NEUROPACS
