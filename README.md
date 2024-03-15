@@ -1,6 +1,6 @@
 [![Unit Tests](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml)
 
-# NeuroPACS Python API
+# neuropacs Python API
 
 Connect to neuropacs diagnostic capabilities with our Python API.
 
