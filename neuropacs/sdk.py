@@ -186,13 +186,19 @@ class Neuropacs:
         random_string = ''.join(secrets.choice(characters) for _ in range(20))
         return random_string
 
-    def get_public_key(self):
+    def get_public_key(self, server_url=None):
         """Retrieve public key from server.
+
+        :param str server_url: Server URL of Neuropacs instance
 
         :return: Base64 string public key.
         """
+
+        if server_url is None:
+            server_url = self.server_url
+
         try:
-            res = requests.get(f"{self.server_url}/api/getPubKey")
+            res = requests.get(f"{server_url}/api/getPubKey")
 
             if not res.ok:
                 raise Exception({"neuropacsError": f"{res.text}"})
@@ -210,19 +216,23 @@ class Neuropacs:
     def connect(self):
         """Create a connection with the server
 
+        :param str client: Client source (default = 'api')
+
         Returns:
         :returns: Connection object (timestamp, connection_id, order_id)
         """
+
         try:
             headers = {
             'Content-Type': 'text/plain',
             'client': self.client
             }
 
-            self.aes_key = self.__generate_aes_key()
+            aes_key = self.__generate_aes_key()
+            self.aes_key = aes_key
 
             body = {
-                "aes_key": self.aes_key,
+                "aes_key": aes_key,
                 "api_key": self.api_key
             }
 
@@ -241,7 +251,7 @@ class Neuropacs:
             return {
                 "timestamp": formatted_datetime + " UTC",
                 "connection_id": connection_id,
-                "aes_key": self.aes_key,
+                "aes_key": aes_key,
             }
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
@@ -251,41 +261,66 @@ class Neuropacs:
             
 
 
-    def upload_dataset(self, directory, order_id=None):
+    def upload_dataset(self, directory, order_id=None, connection_id=None, callback=None):
         """Upload a dataset to the server
 
         :param str directory: Path to dataset folder to be uploaded.
-        :param str order_id: Base64 order_id (optional)
+        :param str order_id: Base64 order_id
+        :param str connection_id: Base64 connection_id
+        :param str callback: Function to be called after every upload
 
         :return: Upload status code.
         """
+        if order_id is None:
+            order_id = self.order_id
+
+        if connection_id is None:
+            connection_id = self.connection_id
+
         try:
             self.dataset_upload = True
             
-            if order_id == None:
-                order_id = self.order_id
-
             if isinstance(directory,str):
                 if not os.path.isdir(directory):
                     raise Exception({"neuropacsError": "Path not a directory!"}) 
             else:
                 raise Exception({"neuropacsError": "Path must be a string!"}) 
 
-            datasetID = os.path.basename(directory)
-            hash_object = hashlib.sha256()
-            hash_object.update(datasetID.encode())
-            hex_dig = hash_object.hexdigest()
+            dataset_id = self.__generate_filename()
 
             total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
+
+            files_uploaded = 0
 
             with tqdm(total=total_files, desc="Uploading", unit="file") as prog_bar:
                 for dirpath, _, filenames in os.walk(directory):
                     for filename in filenames:
                         file_path = os.path.join(dirpath, filename)
-                        self.upload(file_path, hex_dig, order_id)
+                        status = self.upload(file_path, dataset_id, order_id, connection_id)
+                        if status != 201:
+                            if callback is not None:
+                               callback({
+                                'datasetId': dataset_id,
+                                'progress': -1,
+                                }) 
+                            raise Exception({"neuropacsError": "Upload failed!"})
+                        files_uploaded += 1
+                        if callback is not None:
+                            # Calculate progress and round to two decimal places
+                            progress = (files_uploaded / total_files) * 100
+                            progress = round(progress, 2)
+
+                            # Ensure progress is exactly 100 if it's effectively 100
+                            progress = 100 if progress == 100.0 else progress
+                            callback({
+                                'datasetId': dataset_id,
+                                'progress': progress,
+                                'filesUploaded': files_uploaded
+                            })
+                        
                         prog_bar.update(1)  # Update the outer progress bar for each file
             
-            return hex_dig
+            return dataset_id
 
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
@@ -294,20 +329,24 @@ class Neuropacs:
                 raise Exception("Dataset upload failed.")
 
 
-    def upload(self, data, datasetID, order_id=None):
+    def upload(self, data, dataset_id, order_id=None, connection_id=None):
         """Upload a file to the server
 
         :param str/bytes data: Path of file to be uploaded or byte array
-        :param str order_id: Base64 order_id (optional)
-        :param str presigned_url: Presigned URL for S3 bucket upload
+        :param str dataset_id Base64 dataset_id
+        :param str order_id: Base64 order_id 
+        :param str connection_id: Base64 connection_id
 
         :return: Upload status code.
         """
 
         # if not self.dataset_upload:
 
-        if order_id == None:
+        if order_id is None:
             order_id = self.order_id
+
+        if connection_id is None:
+            connection_id = self.connection_id
 
         # get file name
         filename = ""
@@ -327,7 +366,7 @@ class Neuropacs:
         encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
 
         # create headers
-        headers = {"Content-Type": "application/octet-stream",'connection-id': self.connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': datasetID}
+        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id}
 
         # get s3 upload params
         res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
@@ -362,19 +401,21 @@ class Neuropacs:
 
         header_bytes = header.encode("utf-8")
 
+        footer_bytes = END.encode("utf-8")
+
         encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
 
         payload_data = None
 
         if isinstance(data, bytes):
             # encrypted_binary_data = self.__encrypt_aes_ctr(data, "bytes","bytes")
-            payload_data = header_bytes + data + END.encode("utf-8")
+            payload_data = header_bytes + data + footer_bytes
         
         elif isinstance(data,str):
             with open(data, 'rb') as f:
                 binary_data = f.read()
                 # encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
-                payload_data = header_bytes + binary_data + END.encode("utf-8")
+                payload_data = header_bytes + binary_data + footer_bytes
 
 
         res = requests.put(presigned_url, data=payload_data)
@@ -384,13 +425,56 @@ class Neuropacs:
 
         return 201
 
-    def new_job (self):
+    def validate_upload(self, file_array, dataset_id, order_id=None, connection_id=None):
+        """
+        Validate dataset upload
+        """
+        if connection_id is None:
+            connection_id = self.connection_id
+        if order_id is None:
+            order_id = self.order_id
+        try:
+            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
+        
+            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client}
+
+            body = {
+                'fileArray': file_array,
+            }
+
+            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+            res = requests.post(f"{self.server_url}/api/verifyUpload/", data=encrypted_body, headers=headers)
+            
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
+
+            text = res.text
+            decrypted_dataset_validation = self.__decrypt_aes_ctr(text, "string")
+            return decrypted_dataset_validation
+
+        except Exception as e:
+            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
+                raise Exception(e.args[0]['neuropacsError'])
+            else:
+                raise Exception(f"Result retrieval failed!")
+        
+
+
+
+    def new_job (self, connection_id=None):
         """Create a new order
+
+        :param str connection_id: Base64 connection_id
 
         :return: Base64 string order_id.
         """
+
+        if connection_id is None:
+            connection_id = self.connection_id
+
         try:
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
 
             res = requests.post(f"{self.server_url}/api/newJob/", headers=headers)
 
@@ -408,24 +492,37 @@ class Neuropacs:
                 raise Exception("Job creation failed.")            
 
 
-    def run_job(self, product_id, order_id=None):
+    def run_job(self, product_id, order_id=None, dataset_id=None, connection_id=None):
         """Run a job
         
         :param str productID: Product to be executed.
-        :prarm str order_id: Base64 order_id (optional)
+        :prarm str order_id: Base64 order_id 
+        :prarm str dataset_id: Base64 dataset_id 
+        :param str connection_id: Base64 connection_id
         
         :return: Job run status code.
         """
+        if order_id == None:
+            order_id = self.order_id
+
+        if connection_id is None:
+            connection_id = self.connection_id
+
         try:
-            if order_id == None:
-                order_id = self.order_id
+            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
-
-            body = {
-                'orderID': order_id,
-                'productID': product_id
-            }
+            body={}
+            if dataset_id is None:
+                body = {
+                    'orderID': order_id,
+                    'productID': product_id,
+                }
+            else:
+                body = {
+                    'orderID': order_id,
+                    'productID': product_id,
+                    'datasetID': dataset_id
+                }
 
             encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -443,25 +540,34 @@ class Neuropacs:
                 raise Exception("Job run failed.")  
 
 
-    def check_status(self, order_id=None, dataset_id=None):
+    def check_status(self, order_id=None, dataset_id=None, connection_id=None):
         """Check job status
 
         :param str order_id: Base64 order_id (optional)
         :param str dataset_id: Base64 dataset_id (optional)
-        
+        :param str connection_id: Base64 connection_id
+
         :return: Job status message.
         """
+        if order_id is None:
+            order_id = self.order_id
+
+        if connection_id is None:
+            connection_id = self.connection_id
 
         try:
-            if order_id == None:
-                order_id = self.order_id
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
 
-            body = {
-                'orderID': order_id,
-                'datasetID': dataset_id
-            }
+            if dataset_id is not None:
+                body = {
+                    'orderID': order_id,
+                    'datasetID': dataset_id
+                }
+            else:
+               body = {
+                    'orderID': order_id,
+                }
 
             encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -479,28 +585,39 @@ class Neuropacs:
                 raise Exception(e.args[0]['neuropacsError'])
             else:
                 raise Exception("Status check failed.")  
-            
 
 
-    def get_results(self, format, order_id=None, dataset_id=None):
+    def get_results(self, format, order_id=None, dataset_id=None, connection_id=None):
         """Get job results
 
         :param str format: Format of file data
         :prarm str order_id: Base64 order_id (optional)
+        :param str connection_id: Base64 connection_id
 
         :return: AES encrypted file data in specified format
         """
+
+        if order_id is None:
+            order_id = self.order_id
+
+        if connection_id is None:
+            connection_id = self.connection_id
+        
         try:
-            if order_id == None:
-                order_id = self.order_id
+        
+            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
-
-            body = {
-                'orderID': order_id,
-                'format': format,
-                'datasetID': dataset_id
-            }
+            if dataset_id is not None:
+                body = {
+                    'orderID': order_id,
+                    'format': format,
+                    'datasetID': dataset_id
+                }
+            else:
+                body = {
+                    'orderID': order_id,
+                    'format': format               
+                }
 
             validFormats = ["TXT", "XML", "JSON", "PDF", "DCM"]
 
