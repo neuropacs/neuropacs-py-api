@@ -20,14 +20,14 @@ def main():
     print(conn)
 
     # # # CREATE A NEW JOB
-    # order = npcs.new_job()
-    # print(order)
+    order = npcs.new_job()
+    print(order)
 
     # # # UPLOAD A DATASET
-    # # upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
-    # # # print(upload)
-    # datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small", None, None, callback=lambda data: print(f"Dataset ID: {data['datasetId']}, Progress: {data['progress']}%, Files Uploaded: {data['filesUploaded']}"))
-    # print(datasetID)
+    # upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
+    # print(upload)
+    datasetID = npcs.upload_dataset("../dicom_examples/06_001", None, None, callback=lambda data: print(f"Dataset ID: {data['datasetId']}, Progress: {data['progress']}%, Files Uploaded: {data['filesUploaded']}"))
+    print(datasetID)
 
     # verUpl = npcs.validate_upload(["woo_I0", "woo_I2", "woo_I3", "woo_I4","woo_I7", "woo_I8", "woo_I9","woo_I10", "woo_I11"], "ROBRg7N2xj0o2w4Gpmoy", "CH5uWzAZoiHB7AtemEqK")
     # print(verUpl)
@@ -41,8 +41,8 @@ def main():
     # print(status)
 
     # # # # GET RESULTS
-    results = npcs.get_results(result_format, "WgcvoJQk3xFNiOPMoPZ6", "WgcvoJQk3xFNiOPMoPZ6")
-    print(results)
+    # results = npcs.get_results(result_format, "WgcvoJQk3xFNiOPMoPZ6", "WgcvoJQk3xFNiOPMoPZ6")
+    # print(results)
 
     
 
