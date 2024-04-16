@@ -365,19 +365,6 @@ class Neuropacs:
         # encrypt order ID
         encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
 
-        # create headers
-        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id}
-
-        # get s3 upload params
-        res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
-
-        if not res.ok:
-            raise Exception({"neuropacsError": f"{res.text}"})
-
-        decrypted_s3_info = self.__decrypt_aes_ctr(res.text, "json")
-
-        presigned_url = decrypted_s3_info["presignedURL"]
-
         form = {
             "Content-Disposition": "form-data",
             "filename": filename,
@@ -416,6 +403,22 @@ class Neuropacs:
                 binary_data = f.read()
                 # encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
                 payload_data = header_bytes + binary_data + footer_bytes
+
+
+        # create headers for upload request
+        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id}
+
+        # get s3 upload params
+        res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
+
+        if not res.ok:
+            raise Exception({"neuropacsError": f"{res.text}"})
+
+        #decrypt response
+        decrypted_s3_info = self.__decrypt_aes_ctr(res.text, "json")
+
+        #extract data from response
+        presigned_url = decrypted_s3_info["presignedURL"]
 
 
         res = requests.put(presigned_url, data=payload_data)
