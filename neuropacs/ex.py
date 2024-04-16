@@ -20,12 +20,12 @@ def main():
     print(conn)
 
     # # # CREATE A NEW JOB
-    # order = npcs.new_job()
-    # print(order)
+    order = npcs.new_job()
+    print(order)
 
     # # # UPLOAD A DATASET
-    # # upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
-    # # # print(upload)
+    upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
+    print(upload)
     # datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small", None, None, callback=lambda data: print(f"Dataset ID: {data['datasetId']}, Progress: {data['progress']}%, Files Uploaded: {data['filesUploaded']}"))
     # print(datasetID)
 
@@ -41,8 +41,8 @@ def main():
     # print(status)
 
     # # # # GET RESULTS
-    results = npcs.get_results(result_format, "WgcvoJQk3xFNiOPMoPZ6", "WgcvoJQk3xFNiOPMoPZ6")
-    print(results)
+    # results = npcs.get_results(result_format, "WgcvoJQk3xFNiOPMoPZ6", "WgcvoJQk3xFNiOPMoPZ6")
+    # print(results)
 
     
 
