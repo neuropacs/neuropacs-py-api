@@ -5,6 +5,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 import base64
 import string
+import uuid
 import secrets
 from datetime import datetime
 from tqdm import tqdm
@@ -30,6 +31,7 @@ class Neuropacs:
         self.dataset_upload = False
         self.files_uploaded = 0
 
+    # Private methods
     def __generate_aes_key(self):
         """Generate an 16-byte AES key for AES-CTR encryption.
 
@@ -204,6 +206,15 @@ class Neuropacs:
         
         return chunks
 
+
+    def __generate_unique_uuid():
+        """Generate a random v4 uuid
+        :return: V4 UUID string
+        """
+        return str(uuid.uuid4())
+
+    # Public Methods
+
     def get_public_key(self, server_url=None):
         """Retrieve public key from server.
 
@@ -304,7 +315,8 @@ class Neuropacs:
             else:
                 raise Exception({"neuropacsError": "Path must be a string!"}) 
 
-            dataset_id = self.__generate_filename()
+            if(dataset_id == None):
+                dataset_id = self.__generate_unique_uuid()
 
             total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
 
@@ -369,7 +381,7 @@ class Neuropacs:
         # get file name
         filename = ""
         if isinstance(data,bytes):
-            filename = self.__generate_filename()
+            filename = self.__generate_unique_uuid()
         elif isinstance(data,str):
             if os.path.isfile(data):
                 normalized_path = os.path.normpath(data)

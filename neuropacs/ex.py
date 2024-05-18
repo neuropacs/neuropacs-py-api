@@ -3,7 +3,7 @@ from sdk import Neuropacs
 def main():
     # api_key = "your_api_key"
     api_key = "m0ig54amrl87awtwlizcuji2bxacjm"
-    server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev/"
+    server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/v1/"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "JSON"
 
@@ -19,13 +19,13 @@ def main():
     conn = npcs.connect()
     print(conn)
 
-    # # # CREATE A NEW JOB
+    # # # # CREATE A NEW JOB
     order = npcs.new_job()
     print(order)
 
-    # # # UPLOAD A DATASET
-    upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
-    print(upload)
+    # # # # UPLOAD A DATASET
+    # upload = npcs.upload("../dicom_examples/DICOM_small/woo_I0", "test123", order)
+    # print(upload)
     # datasetID = npcs.upload_dataset("../dicom_examples/DICOM_small", None, None, callback=lambda data: print(f"Dataset ID: {data['datasetId']}, Progress: {data['progress']}%, Files Uploaded: {data['filesUploaded']}"))
     # print(datasetID)
 
@@ -37,8 +37,8 @@ def main():
     # print(job)
 
     # # # CHECK STATUS
-    # status = npcs.check_status("TEST", "WgcvoJQk3xFNiOPMoPZ6")
-    # print(status)
+    status = npcs.check_status("TEST", "WgcvoJQk3xFNiOPMoPZ6")
+    print(status)
 
     # # # # GET RESULTS
     # results = npcs.get_results(result_format, "WgcvoJQk3xFNiOPMoPZ6", "WgcvoJQk3xFNiOPMoPZ6")
