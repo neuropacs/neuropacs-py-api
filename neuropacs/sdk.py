@@ -5,6 +5,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 import base64
 import string
+import uuid
 import secrets
 from datetime import datetime
 from tqdm import tqdm
@@ -30,6 +31,7 @@ class Neuropacs:
         self.dataset_upload = False
         self.files_uploaded = 0
 
+    # Private methods
     def __generate_aes_key(self):
         """Generate an 16-byte AES key for AES-CTR encryption.
 
@@ -178,13 +180,34 @@ class Neuropacs:
             else:
                 raise Exception("AES decryption failed!")
     
-    def __generate_filename(self):
-        """Generate a filename for byte data
-        :return: 20 character random alphanumeric string
+
+
+    def __chunkify_image(self, data, num_chunks, chunk_size):
         """
-        characters = string.ascii_letters + string.digits
-        random_string = ''.join(secrets.choice(characters) for _ in range(20))
-        return random_string
+        Break image into chunks
+        """
+        chunks = []
+    
+        # Split the data into chunks
+        for i in range(num_chunks):
+            # Calculate the start and end indices for this chunk
+            start_index = i * chunk_size
+            end_index = start_index + chunk_size
+            # Slice the data from start index to end index
+            chunk = data[start_index:end_index]
+            # Append the chunk to the list of chunks
+            chunks.append(chunk)
+        
+        return chunks
+
+
+    def __generate_unique_uuid():
+        """Generate a random v4 uuid
+        :return: V4 UUID string
+        """
+        return str(uuid.uuid4())
+
+    # Public Methods
 
     def get_public_key(self, server_url=None):
         """Retrieve public key from server.
@@ -286,7 +309,8 @@ class Neuropacs:
             else:
                 raise Exception({"neuropacsError": "Path must be a string!"}) 
 
-            dataset_id = self.__generate_filename()
+            if(dataset_id == None):
+                dataset_id = self.__generate_unique_uuid()
 
             total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
 
@@ -351,7 +375,7 @@ class Neuropacs:
         # get file name
         filename = ""
         if isinstance(data,bytes):
-            filename = self.__generate_filename()
+            filename = self.__generate_unique_uuid()
         elif isinstance(data,str):
             if os.path.isfile(data):
                 normalized_path = os.path.normpath(data)
@@ -404,9 +428,18 @@ class Neuropacs:
                 # encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
                 payload_data = header_bytes + binary_data + footer_bytes
 
+        # Convert MB to bytes
+        chunk_size_bytes = 5 * 1024 * 1024
+        
+        # Determine the total number of chunks
+        total_chunks = (len(payload_data) + chunk_size_bytes - 1) // chunk_size_bytes   
+
+        print(len(payload_data))
+        print(chunk_size_bytes)
+        print(f"Total chunks: {total_chunks}")
 
         # create headers for upload request
-        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id}
+        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id, 'num-parts': str(total_chunks)}
 
         # get s3 upload params
         res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
@@ -414,14 +447,41 @@ class Neuropacs:
         if not res.ok:
             raise Exception({"neuropacsError": f"{res.text}"})
 
+        # chunkify image
+        data_chunks = self.__chunkify_image(payload_data, total_chunks, chunk_size_bytes)
+
         #decrypt response
         decrypted_s3_info = self.__decrypt_aes_ctr(res.text, "json")
 
-        #extract data from response
-        presigned_url = decrypted_s3_info["presignedURL"]
+        #extract upload params from response
+        presigned_urls = decrypted_s3_info["presignedURLs"]
+        bucket_name = decrypted_s3_info["bucket"]
+        object_key = decrypted_s3_info["key"]
+        upload_id = decrypted_s3_info["uploadId"]
 
+        parts_object = []
 
-        res = requests.put(presigned_url, data=payload_data)
+        # upload each chunk (!!!split into threads!!!)
+        for i in range(total_chunks):
+            res = requests.put(presigned_urls[i], data=data_chunks[i])
+            if not res.ok:
+                raise Exception({"neuropacsError": f"{res.text}"})
+            parts_object.append({"PartNumber": i+1, "ETag": res.headers.etag})
+
+        print(parts_object)
+
+        headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'dataset-id': dataset_id, 'client': self.client}
+
+        body = {
+            'bucket': bucket_name,
+            'key': object_key,
+            'uploadId': upload_id,
+            'uploadParts': parts_object
+        }
+
+        encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+        res = requests.post(f"{self.server_url}/api/completeUpload/", data=encrypted_body, headers=headers)
 
         if not res.ok:
             raise Exception({"neuropacsError": f"{res.text}"})
