@@ -181,7 +181,6 @@ class Neuropacs:
                 raise Exception("AES decryption failed!")
     
 
-
     def __chunkify_image(self, data, num_chunks, chunk_size):
         """
         Break image into chunks
@@ -201,7 +200,7 @@ class Neuropacs:
         return chunks
 
 
-    def __generate_unique_uuid():
+    def __generate_unique_uuid(self):
         """Generate a random v4 uuid
         :return: V4 UUID string
         """
@@ -284,65 +283,64 @@ class Neuropacs:
             
 
 
-    def upload_dataset(self, directory, order_id=None, connection_id=None, callback=None):
+    def upload_dataset(self, directory, order_id=None, dataset_id=None, callback=None):
         """Upload a dataset to the server
 
         :param str directory: Path to dataset folder to be uploaded.
         :param str order_id: Base64 order_id
-        :param str connection_id: Base64 connection_id
+        :param str dataset_id: Base64 dataset_id
         :param str callback: Function to be called after every upload
 
         :return: Upload status code.
         """
-        if order_id is None:
-            order_id = self.order_id
-
-        if connection_id is None:
-            connection_id = self.connection_id
-
         try:
-            self.dataset_upload = True
-            
             if isinstance(directory,str):
                 if not os.path.isdir(directory):
-                    raise Exception({"neuropacsError": "Path not a directory!"}) 
+                    raise Exception("Path not a directory") 
             else:
-                raise Exception({"neuropacsError": "Path must be a string!"}) 
+                raise Exception("Path must be a string") 
 
-            if(dataset_id == None):
+            if order_id is None:
+                order_id = self.order_id
+
+            if dataset_id is None:
                 dataset_id = self.__generate_unique_uuid()
 
-            total_files = sum(len(filenames) for _, _, filenames in os.walk(directory))
+            zip_builder_object = {} # Object of chunks, each value is an array of files
 
-            files_uploaded = 0
+            max_zip_size = 250000000 # Max size of zip file (25 MB)
+            total_parts = 0 # Counts total parts the dataset is divided into
+            cur_zip_size = 0 # Counts size of current zip file
+            zipI_index = 0 # Counts index of zip file
 
-            with tqdm(total=total_files, desc="Uploading", unit="file") as prog_bar:
-                for dirpath, _, filenames in os.walk(directory):
-                    for filename in filenames:
-                        file_path = os.path.join(dirpath, filename)
-                        status = self.upload(file_path, dataset_id, order_id, connection_id)
-                        if status != 201:
-                            if callback is not None:
-                               callback({
-                                'datasetId': dataset_id,
-                                'progress': -1,
-                                }) 
-                            raise Exception({"neuropacsError": "Upload failed!"})
-                        files_uploaded += 1
-                        if callback is not None:
-                            # Calculate progress and round to two decimal places
-                            progress = (files_uploaded / total_files) * 100
-                            progress = round(progress, 2)
+            for dirpath, _, filenames in os.walk(directory):
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename) 
+                    cur_zip_size += os.path.getsize(file_path) # Increment current file set size
+                    # print(file_path)
+            #         status = self.upload(file_path, dataset_id, order_id, connection_id)
+            #         if status != 201:
+            #             if callback is not None:
+            #                 callback({
+            #                 'datasetId': dataset_id,
+            #                 'progress': -1,
+            #                 }) 
+            #             raise Exception({"neuropacsError": "Upload failed!"})
+            #         files_uploaded += 1
+            #         if callback is not None:
+            #             # Calculate progress and round to two decimal places
+            #             progress = (files_uploaded / total_files) * 100
+            #             progress = round(progress, 2)
 
-                            # Ensure progress is exactly 100 if it's effectively 100
-                            progress = 100 if progress == 100.0 else progress
-                            callback({
-                                'datasetId': dataset_id,
-                                'progress': progress,
-                                'filesUploaded': files_uploaded
-                            })
-                        
-                        prog_bar.update(1)  # Update the outer progress bar for each file
+            #             # Ensure progress is exactly 100 if it's effectively 100
+            #             progress = 100 if progress == 100.0 else progress
+            #             callback({
+            #                 'datasetId': dataset_id,
+            #                 'progress': progress,
+            #                 'filesUploaded': files_uploaded
+            #             })
+                    
+    
             
             return dataset_id
 
