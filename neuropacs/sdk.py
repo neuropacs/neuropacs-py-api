@@ -4,12 +4,10 @@ import json
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad
 import base64
-import string
+import zipfile
+import io
 import uuid
-import secrets
 from datetime import datetime
-from tqdm import tqdm
-import hashlib
 from Crypto.Cipher import AES
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -179,32 +177,335 @@ class Neuropacs:
                 raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("AES decryption failed!")
-    
-
-    def __chunkify_image(self, data, num_chunks, chunk_size):
-        """
-        Break image into chunks
-        """
-        chunks = []
-    
-        # Split the data into chunks
-        for i in range(num_chunks):
-            # Calculate the start and end indices for this chunk
-            start_index = i * chunk_size
-            end_index = start_index + chunk_size
-            # Slice the data from start index to end index
-            chunk = data[start_index:end_index]
-            # Append the chunk to the list of chunks
-            chunks.append(chunk)
-        
-        return chunks
-
 
     def __generate_unique_uuid(self):
         """Generate a random v4 uuid
         :return: V4 UUID string
         """
         return str(uuid.uuid4())
+
+    def __read_file_contents(self, file_path):
+        """
+        Read file conents of file at file_path
+
+        :param str file_path Path to the file to be read
+
+        :return: File contents in bytes
+        """
+        with open(file_path, 'rb') as file:
+            contents = file.read()
+        return contents
+
+    def __new_multipart_upload(self, dataset_id, zip_index, order_id):
+        """
+        Start a new multipart upload
+
+        :param str dataset_id Base64 dataset_id
+        :param int zip_index Index of zip file
+        :param str order_id Base65 order_id
+
+        :returns AWS upload_id
+        """
+        try:
+            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
+        
+            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client}
+
+            body = {
+                'datasetId': dataset_id,
+                'zipIndex': str(zip_index)
+            }
+
+            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+            res = requests.post(f"{self.server_url}/api/multipartUploadRequest/", data=encrypted_body, headers=headers)
+
+            if not res.ok:
+                raise Exception(json.loads(res.text)["error"])
+
+            text = res.text
+            res_json = self.__decrypt_aes_ctr(text, "json")
+            upload_id = res_json["uploadId"]
+
+            return upload_id
+
+        except Exception as e:
+            raise Exception(f"Multipart upload initialization failed: {str(e)}")
+            
+
+    def __complete_multipart_upload(self, order_id, dataset_id, zip_index, upload_id, upload_parts):
+        """
+        Complete a new multipart upload
+
+        :param str order_id Base64 order_id
+        :param str dataset_id Base64 dataset_id
+        :param int zip_index Index of zip file
+        :param str upload_id Base64 upload_id
+        :param dict upload_parts Uploaded parts dict
+
+        :returns Status code
+        """
+        try:
+            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
+        
+            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client}
+
+            body = {
+                'datasetId': dataset_id,
+                'zipIndex': zip_index,
+                'uploadId': upload_id,
+                'uploadParts': upload_parts
+            }
+
+            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+            res = requests.post(f"{self.server_url}/api/completeMultipartUpload/", data=encrypted_body, headers=headers)
+
+            if not res.ok:
+                raise Exception(json.loads(res.text)["error"])
+
+            return 200
+
+        except Exception as e:
+            raise Exception(f"ultipart upload completion failed: {str(e)}")
+
+    def __upload_part(self, upload_id, dataset_id, zip_index, order_id, part_number, part_data):
+        """
+        Upload a part of the multipart upload
+
+        :param str upload_id Base64 upload_id
+        :param str dataset_id Base64 dataset_id
+        :param int zip_index Index of zip file
+        :param str order_id Base64 orderId
+        :param int part_number Part number
+        :param bytes part_data Part data
+
+        :return Etag
+        """
+        try:
+            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
+        
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id,'order-id': encrypted_order_id, 'client': self.client}
+
+            body = {
+                'datasetId': dataset_id,
+                'uploadId': upload_id,
+                'partNumber': str(part_number),
+                'zipIndex': str(zip_index)
+            }
+
+            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+            res = requests.post(f"{self.server_url}/api/multipartPresignedUrl/", data=encrypted_body, headers=headers)
+            
+            if not res.ok:
+                raise Exception(json.loads(res.text)["error"])
+
+            text = res.text
+            res_json = self.__decrypt_aes_ctr(text, "json")
+            presigned_url = res_json["presignedURL"] # URL to upload part
+
+
+            fail = False
+            for attempt in range(3):
+                upload_res = requests.put(presigned_url, data=part_data)
+
+                if not upload_res.ok:
+                    fail = True
+                else:
+                    e_tag = upload_res.headers.get('ETag')
+                    return e_tag
+
+            if fail:
+                raise Exception("Upload failed after 3 attempts")
+
+        except Exception as e:
+            raise Exception(f"Upload part failed: {str(e)}")
+
+
+    def __split_zip_contents(self, zip_contents, part_size):
+        """
+        Split zip contents into chunk of part_size for upload
+
+        :param bytes zip_contents Bytes content of zip file
+        :param int part_size Size of each chunk
+        """
+        try:
+            parts = []
+            start = 0
+            while start < len(zip_contents):
+                end = min(start + part_size, len(zip_contents))
+                parts.append(zip_contents[start:end])
+                start = end
+            return parts
+        except Exception as error:
+            raise Exception(f"Partitioning blob failed: {str(error)}")
+
+    def __attempt_upload_dataset(self, directory, order_id=None, dataset_id=None, callback=None):
+        """Upload a dataset to the server
+
+        :param str directory: Path to dataset folder to be uploaded.
+        :param str order_id: Base64 order_id
+        :param str dataset_id: Base64 dataset_id
+        :param str callback: Function to be called after every upload
+
+        :return: Upload status code.
+        """
+        try:
+            if isinstance(directory,str):
+                if not os.path.isdir(directory):
+                    raise Exception("Path not a directory") 
+            else:
+                raise Exception("Path must be a string") 
+
+            if order_id is None:
+                order_id = self.order_id
+
+            if dataset_id is None:
+                dataset_id = self.__generate_unique_uuid()
+
+            zip_builder_object = {} # Object of chunks, each value is an array of files
+
+            # Calculate number of files in the directory
+            total_files = 0 
+            for dirpath, _, filenames in os.walk(directory):
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename) # Get full file path
+                    if os.path.isfile(file_path):
+                        total_files += 1
+
+            files_processed = 0
+
+            max_zip_size = 50000000 # Max size of zip file (5MB)
+            total_parts = 0 # Counts total parts the dataset is divided into
+            cur_zip_size = 0 # Counts size of current zip file
+            zip_index = 0 # Counts index of zip file
+
+            for dirpath, _, filenames in os.walk(directory):
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename) # Get full file path
+                    # Throw error if not a file
+                    if not os.path.isfile(file_path):
+                        raise Exception(f"Object {file_path} is not a file.")
+
+                    cur_zip_size += os.path.getsize(file_path) # Increment current file set size
+
+                    # Create list at zipIndex if it does not already exist
+                    if zip_index not in zip_builder_object:
+                        zip_builder_object[zip_index] = []
+                        total_parts += 1
+
+                
+                    # Push file to the list at zipIndex 
+                    zip_builder_object[zip_index].append({"filename": filename, "path": file_path})
+
+                    # If current chunk size is larger than max, start next chunk
+                    if cur_zip_size > max_zip_size:
+                        zip_index += 1
+                        cur_zip_size = 0
+
+                    files_processed += 1 # Increment number of processed files
+
+                    if callback is not None:
+                        # Calculate progress and round to two decimal places
+                        progress = (files_processed / total_files) * 100
+                        progress = round(progress, 2)
+
+                        # Ensure progress is exactly 100 if it's effectively 100
+                        progress = 100 if progress == 100.0 else progress
+                        callback({
+                            'dataset_id': dataset_id,
+                            'progress': progress,
+                            'status': "Preprocessing"
+                        })
+
+            # Start zipping and uploading each chunk
+            for chunk in zip_builder_object:
+                # Get upload_id for this chunk
+                upload_id = self.__new_multipart_upload(dataset_id, chunk, order_id)
+
+                # BytesIO object to hold the ZIP file in memory
+                zip_buffer = io.BytesIO()
+
+                # Create a write stream into the zip file
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    cur_chunk = zip_builder_object[chunk]
+                    # For each file in the chunk, add to zip buffer
+                    for file in range(len(cur_chunk)):
+                        filename = cur_chunk[file]['filename']
+                        path = cur_chunk[file]['path']
+                        file_contents = self.__read_file_contents(path)
+                        zip_file.writestr(filename, file_contents)
+                        # Call progress callback
+                        if callback is not None:
+                            # Calculate progress and round to two decimal places
+                            progress = ((file+1) / len(cur_chunk)) * 100
+                            progress = round(progress, 2)
+
+                            # Ensure progress is exactly 100 if it's effectively 100
+                            progress = 100 if progress == 100.0 else progress
+                            callback({
+                                'dataset_id': dataset_id,
+                                'progress': progress,
+                                'status': f"Compressing part {chunk+1}/{total_parts}"
+                            })
+
+                # Seek to the beginning of the BytesIO object before reading
+                zip_buffer.seek(0)
+
+                # Get zip file contents in memory
+                zip_file_contents = zip_buffer.getvalue()
+
+                part_size = 5 * 1024 * 1024 # 5MB minimum part size
+
+                # Break zip contents into chunks of part_size
+                zip_parts = self.__split_zip_contents(zip_file_contents, part_size)
+
+                final_parts = [] # Holds part details for complete multi upload
+
+                for up in range(len(zip_parts)):
+                    e_tag = self.__upload_part(upload_id, dataset_id, chunk, order_id, up+1, zip_parts[up])
+
+                    final_parts.append({'PartNumber': up+1, 'ETag': e_tag})
+
+                    # Call progress callback
+                    if callback is not None:
+                        # Calculate progress and round to two decimal places
+                        progress = ((up+1) / len(zip_parts)) * 100
+                        progress = round(progress, 2)
+
+                        # Ensure progress is exactly 100 if it's effectively 100
+                        progress = 100 if progress == 100.0 else progress
+                        callback({
+                            'dataset_id': dataset_id,
+                            'progress': progress,
+                            'status': f"Uploading part {chunk+1}/{total_parts}"
+                        })
+
+                self.__complete_multipart_upload(order_id, dataset_id, str(chunk), upload_id, final_parts)
+
+            return 201
+
+        except Exception as e:
+           raise Exception(f"Dataset upload failed: {str(e)}")
+
+    def __split_array(self, array, part_size):
+        """
+        Split array into part_size pieces for processing.
+        
+        :param str array List to be split
+        :param int part_size Size of each chunk
+
+        :return: List of chunks
+        """
+        if part_size <= 0:
+            raise ValueError("Chunk size must be greater than 0")
+
+        result = []
+        for i in range(0, len(array), part_size):
+            chunk = array[i:i + part_size]
+            result.append(chunk)
+        return result
 
     # Public Methods
 
@@ -223,16 +524,13 @@ class Neuropacs:
             res = requests.get(f"{server_url}/api/getPubKey")
 
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
 
             json = res.json()
             pub_key = json['pub_key']
             return pub_key
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError']) 
-            else:
-                raise Exception("Public key retrieval failed.")
+            raise Exception(f"Public key retrieval failed: {str(e)}")
             
             
     def connect(self):
@@ -263,7 +561,7 @@ class Neuropacs:
             res = requests.post(f"{self.server_url}/api/connect/", data=encrypted_body, headers=headers)
 
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
 
             json = res.json()
             connection_id = json["connectionID"]
@@ -276,10 +574,7 @@ class Neuropacs:
                 "aes_key": aes_key,
             }
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError']) 
-            else:
-                raise Exception("Connection failed.")
+            raise Exception(f"Connection creation failed: {str(e)}")
             
 
 
@@ -294,283 +589,107 @@ class Neuropacs:
         :return: Upload status code.
         """
         try:
-            if isinstance(directory,str):
-                if not os.path.isdir(directory):
-                    raise Exception("Path not a directory") 
-            else:
-                raise Exception("Path must be a string") 
+            # Attempt upload
+            result = self.__attempt_upload_dataset(directory, order_id, dataset_id, callback)
+            # Return result
+            return result
+        except Exception as e:
+            raise Exception(f"Dataset upload failed: {str(e)}")
 
+
+    def validate_upload(self, directory, dataset_id, order_id=None, callback=None):
+        """
+        Validate dataset upload
+
+        :param list directory Path to dataset
+        :param str dataset_id Base64 dataset_id
+        :param str order_id Base64 order_id
+
+        :returns List of missing files
+        """
+        try:
             if order_id is None:
                 order_id = self.order_id
 
-            if dataset_id is None:
-                dataset_id = self.__generate_unique_uuid()
-
-            zip_builder_object = {} # Object of chunks, each value is an array of files
-
-            max_zip_size = 250000000 # Max size of zip file (25 MB)
-            total_parts = 0 # Counts total parts the dataset is divided into
-            cur_zip_size = 0 # Counts size of current zip file
-            zipI_index = 0 # Counts index of zip file
+            file_list = []
 
             for dirpath, _, filenames in os.walk(directory):
                 for filename in filenames:
-                    file_path = os.path.join(dirpath, filename) 
-                    cur_zip_size += os.path.getsize(file_path) # Increment current file set size
-                    # print(file_path)
-            #         status = self.upload(file_path, dataset_id, order_id, connection_id)
-            #         if status != 201:
-            #             if callback is not None:
-            #                 callback({
-            #                 'datasetId': dataset_id,
-            #                 'progress': -1,
-            #                 }) 
-            #             raise Exception({"neuropacsError": "Upload failed!"})
-            #         files_uploaded += 1
-            #         if callback is not None:
-            #             # Calculate progress and round to two decimal places
-            #             progress = (files_uploaded / total_files) * 100
-            #             progress = round(progress, 2)
+                    file_path = os.path.join(dirpath, filename) # Get full file path
+                    size = os.path.getsize(file_path)
+                    file_list.append({'name': filename, 'size': size})
 
-            #             # Ensure progress is exactly 100 if it's effectively 100
-            #             progress = 100 if progress == 100.0 else progress
-            #             callback({
-            #                 'datasetId': dataset_id,
-            #                 'progress': progress,
-            #                 'filesUploaded': files_uploaded
-            #             })
-                    
-    
-            
-            return dataset_id
+            validation_parts = self.__split_array(file_list, 100)
 
-        except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError']) 
-            else:
-                raise Exception("Dataset upload failed.")
-
-
-    def upload(self, data, dataset_id, order_id=None, connection_id=None):
-        """Upload a file to the server
-
-        :param str/bytes data: Path of file to be uploaded or byte array
-        :param str dataset_id Base64 dataset_id
-        :param str order_id: Base64 order_id 
-        :param str connection_id: Base64 connection_id
-
-        :return: Upload status code.
-        """
-
-        # if not self.dataset_upload:
-
-        if order_id is None:
-            order_id = self.order_id
-
-        if connection_id is None:
-            connection_id = self.connection_id
-
-        # get file name
-        filename = ""
-        if isinstance(data,bytes):
-            filename = self.__generate_unique_uuid()
-        elif isinstance(data,str):
-            if os.path.isfile(data):
-                normalized_path = os.path.normpath(data)
-                directories = normalized_path.split(os.sep)
-                filename = directories[-1]
-            else:
-                raise Exception({"neuropacsError": "Path not a file!"})
-        else:
-            raise Exception({"neuropacsError": "Unsupported data type!"})
-
-        # encrypt order ID
-        encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
-
-        form = {
-            "Content-Disposition": "form-data",
-            "filename": filename,
-            "name":"test123"
-        }
-
-        BOUNDARY = "neuropacs----------"
-        DELIM = ";"
-        CRLF = "\r\n"
-        SEPARATOR="--"+BOUNDARY+CRLF
-        END="--"+BOUNDARY+"--"+CRLF
-        CONTENT_TYPE = "Content-Type: application/octet-stream"
-
-        header = SEPARATOR
-        for key, value in form.items():
-            header += f"{key}: {value}"
-            header += DELIM
-        header += CRLF
-        header += CONTENT_TYPE
-        header += CRLF + CRLF
-
-        header_bytes = header.encode("utf-8")
-
-        footer_bytes = END.encode("utf-8")
-
-        encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
-
-        payload_data = None
-
-        if isinstance(data, bytes):
-            # encrypted_binary_data = self.__encrypt_aes_ctr(data, "bytes","bytes")
-            payload_data = header_bytes + data + footer_bytes
-        
-        elif isinstance(data,str):
-            with open(data, 'rb') as f:
-                binary_data = f.read()
-                # encrypted_binary_data = self.__encrypt_aes_ctr(binary_data, "bytes","bytes")
-                payload_data = header_bytes + binary_data + footer_bytes
-
-        # Convert MB to bytes
-        chunk_size_bytes = 5 * 1024 * 1024
-        
-        # Determine the total number of chunks
-        total_chunks = (len(payload_data) + chunk_size_bytes - 1) // chunk_size_bytes   
-
-        print(len(payload_data))
-        print(chunk_size_bytes)
-        print(f"Total chunks: {total_chunks}")
-
-        # create headers for upload request
-        headers = {"Content-Type": "application/octet-stream",'connection-id': connection_id, 'client': self.client, 'order-id': encrypted_order_id, 'filename': filename, 'dataset-id': dataset_id, 'num-parts': str(total_chunks)}
-
-        # get s3 upload params
-        res = requests.get(f"{self.server_url}/api/uploadRequest/", headers=headers)
-
-        if not res.ok:
-            raise Exception({"neuropacsError": f"{res.text}"})
-
-        # chunkify image
-        data_chunks = self.__chunkify_image(payload_data, total_chunks, chunk_size_bytes)
-
-        #decrypt response
-        decrypted_s3_info = self.__decrypt_aes_ctr(res.text, "json")
-
-        #extract upload params from response
-        presigned_urls = decrypted_s3_info["presignedURLs"]
-        bucket_name = decrypted_s3_info["bucket"]
-        object_key = decrypted_s3_info["key"]
-        upload_id = decrypted_s3_info["uploadId"]
-
-        parts_object = []
-
-        # upload each chunk (!!!split into threads!!!)
-        for i in range(total_chunks):
-            res = requests.put(presigned_urls[i], data=data_chunks[i])
-            if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
-            parts_object.append({"PartNumber": i+1, "ETag": res.headers.etag})
-
-        print(parts_object)
-
-        headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'dataset-id': dataset_id, 'client': self.client}
-
-        body = {
-            'bucket': bucket_name,
-            'key': object_key,
-            'uploadId': upload_id,
-            'uploadParts': parts_object
-        }
-
-        encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
-
-        res = requests.post(f"{self.server_url}/api/completeUpload/", data=encrypted_body, headers=headers)
-
-        if not res.ok:
-            raise Exception({"neuropacsError": f"{res.text}"})
-
-        return 201
-
-    def validate_upload(self, file_array, dataset_id, order_id=None, connection_id=None):
-        """
-        Validate dataset upload
-        """
-        if connection_id is None:
-            connection_id = self.connection_id
-        if order_id is None:
-            order_id = self.order_id
-        try:
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client}
 
-            body = {
-                'fileArray': file_array,
-            }
+            total_validated = 0 # Total files validated
 
-            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+            total_missing_files = [] # Store list of missing files
 
-            res = requests.post(f"{self.server_url}/api/verifyUpload/", data=encrypted_body, headers=headers)
+            for val in range(len(validation_parts)):
+                body = {
+                    'fileMetadata': validation_parts[val],
+                }
+
+                encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+
+                res = requests.post(f"{self.server_url}/api/verifyUpload/", data=encrypted_body, headers=headers)
             
-            if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                if not res.ok:
+                    raise Exception(json.loads(res.text)["error"])
 
-            text = res.text
-            decrypted_dataset_validation = self.__decrypt_aes_ctr(text, "string")
-            return decrypted_dataset_validation
+                text = res.text
+                decrypted_dataset_validation = self.__decrypt_aes_ctr(text, "json")
+                total_missing_files = total_missing_files + decrypted_dataset_validation['missingFiles']
+                total_validated += len(validation_parts[val])
+
+            return {'missingFiles': total_missing_files}
 
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError'])
-            else:
-                raise Exception(f"Result retrieval failed!")
-        
+            raise Exception(f"Upload validation failed: {str(e)}")
 
 
-
-    def new_job (self, connection_id=None):
+    def new_job (self):
         """Create a new order
-
-        :param str connection_id: Base64 connection_id
 
         :return: Base64 string order_id.
         """
-
-        if connection_id is None:
-            connection_id = self.connection_id
-
         try:
-            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
             res = requests.post(f"{self.server_url}/api/newJob/", headers=headers)
 
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
 
             text = res.text
             decrypted_text = self.__decrypt_aes_ctr(text, "string")
             self.order_id = decrypted_text
             return decrypted_text
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError'])
-            else:
-                raise Exception("Job creation failed.")            
+            raise Exception(f"Job creation failed: {str(e)}")
+           
 
 
-    def run_job(self, product_id, order_id=None, dataset_id=None, connection_id=None):
+    def run_job(self, product_id, order_id=None, dataset_id=None):
         """Run a job
         
         :param str productID: Product to be executed.
         :prarm str order_id: Base64 order_id 
         :prarm str dataset_id: Base64 dataset_id 
-        :param str connection_id: Base64 connection_id
         
         :return: Job run status code.
         """
-        if order_id == None:
-            order_id = self.order_id
-
-        if connection_id is None:
-            connection_id = self.connection_id
 
         try:
-            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
+
+            if order_id == None:
+                order_id = self.order_id
+
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
             body={}
             if dataset_id is None:
@@ -590,35 +709,29 @@ class Neuropacs:
             res = requests.post(f"{self.server_url}/api/runJob/", data=encryptedBody, headers=headers)
             
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
 
             return res.status_code
                 
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError'])
-            else:
-                raise Exception("Job run failed.")  
+            raise Exception(f"Job run failed: {str(e)}")
+  
 
 
-    def check_status(self, order_id=None, dataset_id=None, connection_id=None):
+    def check_status(self, order_id=None, dataset_id=None):
         """Check job status
 
         :param str order_id: Base64 order_id (optional)
         :param str dataset_id: Base64 dataset_id (optional)
-        :param str connection_id: Base64 connection_id
 
         :return: Job status message.
         """
         if order_id is None:
             order_id = self.order_id
 
-        if connection_id is None:
-            connection_id = self.connection_id
-
         try:
 
-            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
             if dataset_id is not None:
                 body = {
@@ -635,38 +748,30 @@ class Neuropacs:
             res = requests.post(f"{self.server_url}/api/checkStatus/", data=encryptedBody, headers=headers)
             
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
             
             text = res.text
             json = self.__decrypt_aes_ctr(text, "json")
             return json
             
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError'])
-            else:
-                raise Exception("Status check failed.")  
+            raise Exception(f"Status check failed: {str(e)}")
+ 
 
 
-    def get_results(self, format, order_id=None, dataset_id=None, connection_id=None):
+    def get_results(self, format, order_id=None, dataset_id=None):
         """Get job results
 
         :param str format: Format of file data
         :prarm str order_id: Base64 order_id (optional)
-        :param str connection_id: Base64 connection_id
 
         :return: AES encrypted file data in specified format
         """
-
-        if order_id is None:
-            order_id = self.order_id
-
-        if connection_id is None:
-            connection_id = self.connection_id
-        
         try:
-        
-            headers = {'Content-type': 'text/plain', 'connection-id': connection_id, 'client': self.client}
+            if order_id is None:
+                order_id = self.order_id
+
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
 
             if dataset_id is not None:
                 body = {
@@ -683,24 +788,22 @@ class Neuropacs:
             validFormats = ["TXT", "XML", "JSON", "PDF", "DCM"]
 
             if format not in validFormats:
-                raise Exception({"neuropacsError" : "Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PDF\", \"DCM\" ."})
+                raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PDF\", \"DCM\" .")
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
             res = requests.post(f"{self.server_url}/api/getResults/", data=encrypted_body, headers=headers)
             
             if not res.ok:
-                raise Exception({"neuropacsError": f"{res.text}"})
+                raise Exception(json.loads(res.text)["error"])
 
             text = res.text
             decrypted_file_data = self.__decrypt_aes_ctr(text, "string")
             return decrypted_file_data
 
         except Exception as e:
-            if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
-                raise Exception(e.args[0]['neuropacsError'])
-            else:
-                raise Exception(f"Result retrieval failed!")
+            raise Exception(f"Result retrieval failed: {str(e)}")
+
 
 
     
