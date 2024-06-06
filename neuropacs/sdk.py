@@ -611,13 +611,16 @@ class Neuropacs:
             if order_id is None:
                 order_id = self.order_id
 
-            file_list = []
+            file_list = [] # Holds list of files (filename, size)
+
+            total_file_count = 0 # Tracks total number of files in dataset
 
             for dirpath, _, filenames in os.walk(directory):
                 for filename in filenames:
                     file_path = os.path.join(dirpath, filename) # Get full file path
                     size = os.path.getsize(file_path)
                     file_list.append({'name': filename, 'size': size})
+                    total_file_count +=1
 
             validation_parts = self.__split_array(file_list, 100)
 
@@ -645,6 +648,19 @@ class Neuropacs:
                 decrypted_dataset_validation = self.__decrypt_aes_ctr(text, "json")
                 total_missing_files = total_missing_files + decrypted_dataset_validation['missingFiles']
                 total_validated += len(validation_parts[val])
+
+                if callback is not None:
+                    # Calculate progress and round to two decimal places
+                    progress = (total_validated / total_file_count) * 100
+                    progress = round(progress, 2)
+
+                    # Ensure progress is exactly 100 if it's effectively 100
+                    progress = 100 if progress == 100.0 else progress
+                    callback({
+                        'dataset_id': dataset_id,
+                        'progress': progress,
+                        'status': "Validating"
+                    })
 
             return {'missingFiles': total_missing_files}
 
