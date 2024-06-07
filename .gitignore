@@ -167,3 +167,4 @@ dicom_examples/
 examples/
 tests/
 .DS_Store
+*ex.py
