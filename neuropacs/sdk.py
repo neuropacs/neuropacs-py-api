@@ -509,7 +509,7 @@ class Neuropacs:
 
     # Public Methods
 
-    def get_public_key(self, server_url=None):
+    def get_public_key(self):
         """Retrieve public key from server.
 
         :param str server_url: Server URL of Neuropacs instance
@@ -517,17 +517,20 @@ class Neuropacs:
         :return: Base64 string public key.
         """
 
-        if server_url is None:
-            server_url = self.server_url
-
         try:
-            res = requests.get(f"{server_url}/api/getPubKey")
+
+            headers = {
+            'client': self.client,
+            'x-api-key': self.api_key
+            }
+
+            res = requests.get(f"{self.server_url}/api/getPubKey", headers=headers)
 
             if not res.ok:
                 raise Exception(json.loads(res.text)["error"])
 
-            json = res.json()
-            pub_key = json['pub_key']
+            jsn = res.json()
+            pub_key = jsn['pub_key']
             return pub_key
         except Exception as e:
             raise Exception(f"Public key retrieval failed: {str(e)}")
@@ -545,15 +548,15 @@ class Neuropacs:
         try:
             headers = {
             'Content-Type': 'text/plain',
-            'client': self.client
+            'client': self.client,
+            'x-api-key': self.api_key
             }
 
             aes_key = self.__generate_aes_key()
             self.aes_key = aes_key
 
             body = {
-                "aes_key": aes_key,
-                "api_key": self.api_key
+                "aes_key": aes_key
             }
 
             encrypted_body = self.__oaep_encrypt(body)
@@ -563,8 +566,8 @@ class Neuropacs:
             if not res.ok:
                 raise Exception(json.loads(res.text)["error"])
 
-            json = res.json()
-            connection_id = json["connectionID"]
+            jsn = res.json()
+            connection_id = jsn["connectionID"]
             self.connection_id = connection_id
             current_datetime = datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
