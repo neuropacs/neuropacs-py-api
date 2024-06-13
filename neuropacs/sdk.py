@@ -164,19 +164,74 @@ class Neuropacs:
             # Decrypt the ciphertext and unpad the result
             decrypted = cipher.decrypt(ciphertext)
 
-            decrypted_data = decrypted.decode("utf-8")
+            # print(decrypted)
+
+            
 
             if format_out == "json":
-                decrypted_data = json.loads(decrypted_data)
+                decrypted_data = decrypted.decode("utf-8")
+                return json.loads(decrypted_data)
             elif format_out == "string":
-                pass
+                decrypted_data = decrypted.decode("utf-8")
+                return decrypted_data
+            elif format_out == "bytes":
+                image_bytes =  bytes(decrypted)
+                return io.BytesIO(image_bytes)
 
-            return decrypted_data
         except Exception as e:
             if(isinstance(e.args[0], dict) and 'neuropacsError' in e.args[0]):
                 raise Exception(e.args[0]['neuropacsError']) 
             else:
                 raise Exception("AES decryption failed!")
+
+    def __ensure_unique_name(self, file_set, filename):
+        """
+        Ensures filenames are unique (some scanners produce duplicate filenames)
+
+        :param set file_set: Set of existing file names
+        :param str filename: File name to be added
+
+        :return: New unique filename
+        """
+        hasExt = False
+        if '.' in filename and not filename.startswith('.'):
+            hasExt = True
+
+        base_name = filename.rsplit('.', 1)[0] if hasExt else filename
+        extension = filename.rsplit('.', 1)[-1] if hasExt else ""
+        counter = 1
+
+        new_name = filename
+
+        while new_name in file_set:
+            new_name = f"{base_name}_{counter}.{extension}" if hasExt else f"{base_name}_{counter}"
+            counter += 1
+
+        file_set.add(new_name)
+
+        return new_name
+
+
+
+        
+
+
+
+    
+    # base_name = hasExt ? fileName.replace(/\.[^/.]+$/, "") : fileName; // Extract base name
+    # extension = hasExt ? fileName.split(".").pop() : ""; // Extract extension if exists
+    # counter = 1;
+
+    # let newName = fileName;
+    # while (fileSet.has(newName)) {
+    #   newName = hasExt
+    #     ? `${baseName}_${counter}.${extension}`
+    #     : `${baseName}_${counter}`;
+    #   counter++;
+    # }
+    # fileSet.add(newName);
+    # return newName;
+
 
     def __generate_unique_uuid(self):
         """Generate a random v4 uuid
@@ -209,7 +264,7 @@ class Neuropacs:
         try:
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client}
+            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client, 'x-api-key': self.api_key}
 
             body = {
                 'datasetId': dataset_id,
@@ -248,7 +303,7 @@ class Neuropacs:
         try:
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client}
+            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client, 'x-api-key': self.api_key}
 
             body = {
                 'datasetId': dataset_id,
@@ -285,7 +340,7 @@ class Neuropacs:
         try:
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id,'order-id': encrypted_order_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id,'order-id': encrypted_order_id, 'client': self.client, 'x-api-key': self.api_key}
 
             body = {
                 'datasetId': dataset_id,
@@ -381,6 +436,8 @@ class Neuropacs:
             cur_zip_size = 0 # Counts size of current zip file
             zip_index = 0 # Counts index of zip file
 
+            file_set = set() # Tracks exisitng file names
+
             for dirpath, _, filenames in os.walk(directory):
                 for filename in filenames:
                     file_path = os.path.join(dirpath, filename) # Get full file path
@@ -395,9 +452,10 @@ class Neuropacs:
                         zip_builder_object[zip_index] = []
                         total_parts += 1
 
+                    unqiue_filename = self.__ensure_unique_name(file_set, filename)
                 
                     # Push file to the list at zipIndex 
-                    zip_builder_object[zip_index].append({"filename": filename, "path": file_path})
+                    zip_builder_object[zip_index].append({"filename": unqiue_filename, "path": file_path})
 
                     # If current chunk size is larger than max, start next chunk
                     if cur_zip_size > max_zip_size:
@@ -440,13 +498,13 @@ class Neuropacs:
                         if callback is not None:
                             # Calculate progress and round to two decimal places
                             progress = ((file+1) / len(cur_chunk)) * 100
-                            progress = round(progress, 2)
-
-                            # Ensure progress is exactly 100 if it's effectively 100
-                            progress = 100 if progress == 100.0 else progress
+                            total_progress = round(
+                                (100 / (2 * total_parts)) *
+                                (2 * (chunk + 1 - 1) + progress / 100)
+                                ,2)
                             callback({
                                 'dataset_id': dataset_id,
-                                'progress': progress,
+                                'progress': total_progress,
                                 'status': f"Compressing part {chunk+1}/{total_parts}"
                             })
 
@@ -472,13 +530,16 @@ class Neuropacs:
                     if callback is not None:
                         # Calculate progress and round to two decimal places
                         progress = ((up+1) / len(zip_parts)) * 100
-                        progress = round(progress, 2)
+                        total_progress = round(
+                            (100 / (2 * total_parts)) *
+                            (2 * (chunk + 1 - 1) + 1 + progress / 100)
+                            ,2)
 
                         # Ensure progress is exactly 100 if it's effectively 100
-                        progress = 100 if progress == 100.0 else progress
+                        total_progress = 100 if total_progress == 100.0 else total_progress
                         callback({
                             'dataset_id': dataset_id,
-                            'progress': progress,
+                            'progress': total_progress,
                             'status': f"Uploading part {chunk+1}/{total_parts}"
                         })
 
@@ -629,7 +690,7 @@ class Neuropacs:
 
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client, 'x-api-key': self.api_key}
 
             total_validated = 0 # Total files validated
 
@@ -677,7 +738,7 @@ class Neuropacs:
         :return: Base64 string order_id.
         """
         try:
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
 
             res = requests.post(f"{self.server_url}/api/newJob/", headers=headers)
 
@@ -708,7 +769,7 @@ class Neuropacs:
             if order_id == None:
                 order_id = self.order_id
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
 
             body={}
             if dataset_id is None:
@@ -750,7 +811,7 @@ class Neuropacs:
 
         try:
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
 
             if dataset_id is not None:
                 body = {
@@ -783,6 +844,7 @@ class Neuropacs:
 
         :param str format: Format of file data
         :prarm str order_id: Base64 order_id (optional)
+        :param str dataset_id: Base64 dataset_id
 
         :return: AES encrypted file data in specified format
         """
@@ -790,7 +852,7 @@ class Neuropacs:
             if order_id is None:
                 order_id = self.order_id
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client}
+            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
 
             if dataset_id is not None:
                 body = {
@@ -804,10 +866,10 @@ class Neuropacs:
                     'format': format               
                 }
 
-            validFormats = ["TXT", "XML", "JSON", "PDF", "DCM"]
+            validFormats = ["TXT", "XML", "JSON", "PNG"]
 
             if format not in validFormats:
-                raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PDF\", \"DCM\" .")
+                raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PNG\".")
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -817,8 +879,11 @@ class Neuropacs:
                 raise Exception(json.loads(res.text)["error"])
 
             text = res.text
-            decrypted_file_data = self.__decrypt_aes_ctr(text, "string")
-            return decrypted_file_data
+
+            if format == "TXT" or format == "XML" or format == "JSON":
+                return self.__decrypt_aes_ctr(text, "string")
+            elif format == "PNG":
+                return self.__decrypt_aes_ctr(text, "bytes")
 
         except Exception as e:
             raise Exception(f"Result retrieval failed: {str(e)}")
