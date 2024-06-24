@@ -16,14 +16,13 @@ from cryptography.hazmat.primitives import serialization
 import requests
 
 class Neuropacs:
-    def __init__(self, server_url, api_key, client="api"):
+    def __init__(self, server_url, api_key, origin_type="API"):
         """
         NeuroPACS constructor
         """
         self.server_url = server_url
         self.api_key = api_key
-        self.client = client
-        self.aes_key = self.__generate_aes_key()
+        self.origin_type = origin_type
         self.connection_id = ""
         self.aes_key = ""
         self.dataset_upload = False
@@ -164,10 +163,6 @@ class Neuropacs:
             # Decrypt the ciphertext and unpad the result
             decrypted = cipher.decrypt(ciphertext)
 
-            # print(decrypted)
-
-            
-
             if format_out == "json":
                 decrypted_data = decrypted.decode("utf-8")
                 return json.loads(decrypted_data)
@@ -211,28 +206,6 @@ class Neuropacs:
 
         return new_name
 
-
-
-        
-
-
-
-    
-    # base_name = hasExt ? fileName.replace(/\.[^/.]+$/, "") : fileName; // Extract base name
-    # extension = hasExt ? fileName.split(".").pop() : ""; // Extract extension if exists
-    # counter = 1;
-
-    # let newName = fileName;
-    # while (fileSet.has(newName)) {
-    #   newName = hasExt
-    #     ? `${baseName}_${counter}.${extension}`
-    #     : `${baseName}_${counter}`;
-    #   counter++;
-    # }
-    # fileSet.add(newName);
-    # return newName;
-
-
     def __generate_unique_uuid(self):
         """Generate a random v4 uuid
         :return: V4 UUID string
@@ -261,15 +234,15 @@ class Neuropacs:
 
         :returns AWS upload_id
         """
-        try:
-            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
-        
-            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client, 'x-api-key': self.api_key}
+        try:        
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             body = {
                 'datasetId': dataset_id,
-                'zipIndex': str(zip_index)
+                'zipIndex': str(zip_index),
+                'orderId': order_id
             }
+
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -301,15 +274,15 @@ class Neuropacs:
         :returns Status code
         """
         try:
-            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id,'Order-Id': encrypted_order_id, 'Client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             body = {
                 'datasetId': dataset_id,
                 'zipIndex': zip_index,
                 'uploadId': upload_id,
-                'uploadParts': upload_parts
+                'uploadParts': upload_parts,
+                'orderId': order_id
             }
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
@@ -338,15 +311,14 @@ class Neuropacs:
         :return Etag
         """
         try:
-            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
-        
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id,'order-id': encrypted_order_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             body = {
                 'datasetId': dataset_id,
                 'uploadId': upload_id,
                 'partNumber': str(part_number),
-                'zipIndex': str(zip_index)
+                'zipIndex': str(zip_index),
+                'orderId': order_id
             }
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
@@ -357,9 +329,9 @@ class Neuropacs:
                 raise Exception(json.loads(res.text)["error"])
 
             text = res.text
-            res_json = self.__decrypt_aes_ctr(text, "json")
-            presigned_url = res_json["presignedURL"] # URL to upload part
 
+            res_json = self.__decrypt_aes_ctr(text, "json")
+            presigned_url = res_json["presignedUrl"] # URL to upload part
 
             fail = False
             for attempt in range(3):
@@ -580,10 +552,7 @@ class Neuropacs:
 
         try:
 
-            headers = {
-            'client': self.client,
-            'x-api-key': self.api_key
-            }
+            headers = {'Origin-Type': self.origin_type}
 
             res = requests.get(f"{self.server_url}/api/getPubKey", headers=headers)
 
@@ -600,8 +569,6 @@ class Neuropacs:
     def connect(self):
         """Create a connection with the server
 
-        :param str client: Client source (default = 'api')
-
         Returns:
         :returns: Connection object (timestamp, connection_id, order_id)
         """
@@ -609,8 +576,8 @@ class Neuropacs:
         try:
             headers = {
             'Content-Type': 'text/plain',
-            'client': self.client,
-            'x-api-key': self.api_key
+            'Origin-Type': self.origin_type,
+            'X-Api-Key': self.api_key
             }
 
             aes_key = self.__generate_aes_key()
@@ -628,7 +595,7 @@ class Neuropacs:
                 raise Exception(json.loads(res.text)["error"])
 
             jsn = res.json()
-            connection_id = jsn["connectionID"]
+            connection_id = jsn["connectionId"]
             self.connection_id = connection_id
             current_datetime = datetime.now()
             formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
@@ -690,7 +657,7 @@ class Neuropacs:
 
             encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
         
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'dataset-id': dataset_id,'order-id': encrypted_order_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             total_validated = 0 # Total files validated
 
@@ -699,6 +666,8 @@ class Neuropacs:
             for val in range(len(validation_parts)):
                 body = {
                     'fileMetadata': validation_parts[val],
+                    'orderId': order_id,
+                    'datasetId': dataset_id
                 }
 
                 encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
@@ -738,26 +707,29 @@ class Neuropacs:
         :return: Base64 string order_id.
         """
         try:
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
-            res = requests.post(f"{self.server_url}/api/newJob/", headers=headers)
+            res = requests.get(f"{self.server_url}/api/newJob/", headers=headers)
 
             if not res.ok:
                 raise Exception(json.loads(res.text)["error"])
 
             text = res.text
             decrypted_text = self.__decrypt_aes_ctr(text, "string")
-            self.order_id = decrypted_text
-            return decrypted_text
+
+            order_id = json.loads(decrypted_text)["orderId"]
+
+            self.order_id = order_id
+            return order_id
         except Exception as e:
             raise Exception(f"Job creation failed: {str(e)}")
            
 
 
-    def run_job(self, product_id, order_id=None, dataset_id=None):
+    def run_job(self, product_name, order_id=None):
         """Run a job
         
-        :param str productID: Product to be executed.
+        :param str product_name: Product to be executed.
         :prarm str order_id: Base64 order_id 
         :prarm str dataset_id: Base64 dataset_id 
         
@@ -769,20 +741,12 @@ class Neuropacs:
             if order_id == None:
                 order_id = self.order_id
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
-            body={}
-            if dataset_id is None:
-                body = {
-                    'orderID': order_id,
-                    'productID': product_id,
-                }
-            else:
-                body = {
-                    'orderID': order_id,
-                    'productID': product_id,
-                    'datasetID': dataset_id
-                }
+            body = {
+                'orderId': order_id,
+                'productName': product_name,
+            }
 
             encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -798,7 +762,7 @@ class Neuropacs:
   
 
 
-    def check_status(self, order_id=None, dataset_id=None):
+    def check_status(self, order_id=None):
         """Check job status
 
         :param str order_id: Base64 order_id (optional)
@@ -811,17 +775,12 @@ class Neuropacs:
 
         try:
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
-            if dataset_id is not None:
-                body = {
-                    'orderID': order_id,
-                    'datasetID': dataset_id
-                }
-            else:
-               body = {
-                    'orderID': order_id,
-                }
+        
+            body = {
+                'orderId': order_id,
+            }
 
             encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -839,7 +798,7 @@ class Neuropacs:
  
 
 
-    def get_results(self, format, order_id=None, dataset_id=None):
+    def get_results(self, format, order_id=None):
         """Get job results
 
         :param str format: Format of file data
@@ -852,19 +811,12 @@ class Neuropacs:
             if order_id is None:
                 order_id = self.order_id
 
-            headers = {'Content-type': 'text/plain', 'connection-id': self.connection_id, 'client': self.client, 'x-api-key': self.api_key}
+            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
-            if dataset_id is not None:
-                body = {
-                    'orderID': order_id,
-                    'format': format,
-                    'datasetID': dataset_id
-                }
-            else:
-                body = {
-                    'orderID': order_id,
-                    'format': format               
-                }
+            body = {
+                'orderId': order_id,
+                'format': format               
+            }
 
             validFormats = ["TXT", "XML", "JSON", "PNG"]
 
