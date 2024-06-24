@@ -545,7 +545,7 @@ class Neuropacs:
 
                 self.__complete_multipart_upload(order_id, dataset_id, str(chunk), upload_id, final_parts)
 
-            return 201
+            return dataset_id
 
         except Exception as e:
            raise Exception(f"Dataset upload failed: {str(e)}")
@@ -654,9 +654,9 @@ class Neuropacs:
         """
         try:
             # Attempt upload
-            result = self.__attempt_upload_dataset(directory, order_id, dataset_id, callback)
+            dataset_id_complete = self.__attempt_upload_dataset(directory, order_id, dataset_id, callback)
             # Return result
-            return result
+            return { "dataset_id": dataset_id_complete, "state": "success" }
         except Exception as e:
             raise Exception(f"Dataset upload failed: {str(e)}")
 
