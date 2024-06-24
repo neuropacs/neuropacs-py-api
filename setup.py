@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='neuropacs',
-    version='1.7.3',
-    description='NeuroPACS Python SDK',
+    version='1.7.6',
+    description='neuropacs Python API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Kerrick Cavanaugh',
