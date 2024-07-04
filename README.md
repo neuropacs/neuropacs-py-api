@@ -1,10 +1,8 @@
 [![Integration Tests](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml)
 
-# neuropacs Python API
+# neuropacs™ Python API
 
 Connect to neuropacs diagnostic capabilities with our Python API.
-
-## Getting Started
 
 ### Installation
 
@@ -26,7 +24,7 @@ prediction_format = "XML"
 version = neuropacs.PACKAGE_VERSION
 
 #INITIALIZE NEUROPACS API
-npcs = neuropacs.init(server_url, api_key)
+npcs = neuropacs.init(server_url=server_url, api_key=api_key)
 
 #CONNECT TO NEUROPACS
 connection = npcs.connect()
