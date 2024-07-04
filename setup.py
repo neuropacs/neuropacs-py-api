@@ -2,8 +2,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='neuropacs',
-    version='1.4.9',
-    description='NeuroPACS Python SDK',
+    version='1.7.8',
+    description='neuropacs Python API',
+    license='MIT',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='Kerrick Cavanaugh',
@@ -11,25 +12,13 @@ setup(
     url='https://github.com/neuropacs/neuropacs-py-sdk',
     packages=find_packages(),
     install_requires=[
-        'certifi==2023.5.7',
-        'cffi==1.15.1',
-        'charset-normalizer==3.1.0',
         'cryptography==41.0.1',
-        'idna==3.4',
-        'Naked==0.1.32',
-        'pip==23.3.1',
-        'pycparser==2.21',
-        'pycryptodome==3.18.0',
-        'PyYAML==6.0',
+        'pycryptodome==3.20.0',
         'requests==2.31.0',
-        'setuptools==69.0.2',
-        'shellescape==3.8.1',
+        'rsa==4.9',
         'urllib3==1.26.6',
-        'wheel==0.41.2',
-        'python-socketio==5.10.0',
+        'zipp==3.17.0',
         'tqdm==4.66.1'
-        # add secrets
-        # add string
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
