@@ -1,6 +1,5 @@
 import json
 from datetime import datetime
-import pytz
 import base64
 import uuid
 
