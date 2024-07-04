@@ -13,7 +13,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
-import requests
 
 class Neuropacs:
     def __init__(self, server_url, api_key, origin_type="API"):
@@ -295,7 +294,7 @@ class Neuropacs:
             return 200
 
         except Exception as e:
-            raise Exception(f"ultipart upload completion failed: {str(e)}")
+            raise Exception(f"Multipart upload completion failed: {str(e)}")
 
     def __upload_part(self, upload_id, dataset_id, zip_index, order_id, part_number, part_data):
         """
@@ -790,8 +789,8 @@ class Neuropacs:
                 raise Exception(json.loads(res.text)["error"])
             
             text = res.text
-            json = self.__decrypt_aes_ctr(text, "json")
-            return json
+            jsn = self.__decrypt_aes_ctr(text, "json")
+            return jsn
             
         except Exception as e:
             raise Exception(f"Status check failed: {str(e)}")
