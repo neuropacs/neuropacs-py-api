@@ -43,7 +43,7 @@ class IntegrationTests(unittest.TestCase):
     def test_successful_dataset_upload(self):
         npcs_admin.connect()
         order_id = npcs_admin.new_job()
-        upload_status = npcs_admin.upload_dataset("./test_dataset", order_id=order_id, dataset_id=order_id)
+        upload_status = npcs_admin.upload_dataset("./tests/test_dataset", order_id=order_id, dataset_id=order_id)
         dataset_id = upload_status["dataset_id"]
         state = upload_status["state"]
         self.assertEqual(test_utils.is_dict(upload_status), True)
