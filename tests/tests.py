@@ -41,7 +41,6 @@ class IntegrationTests(unittest.TestCase):
         
     # Successful dataset upload
     def test_successful_dataset_upload(self):
-        print("HERE")
         npcs_admin.connect()
         order_id = npcs_admin.new_job()
         upload_status = npcs_admin.upload_dataset("./tests/test_dataset", order_id=order_id, dataset_id=order_id)
