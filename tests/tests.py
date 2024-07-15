@@ -1,11 +1,14 @@
 import unittest
 import test_utils
+import os
 from neuropacs.sdk import Neuropacs
 
 server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev"
 invalidServerUrl = "https://invalid.execute-api.us-east-2.amazonaws.com/not_real"
-admin_key = "cdXVNIFzEUbSElTpoVoK4SyRrJ7Zj6n6Y6wgApIc"
-reg_key = "7PRHFkrxE71dpBNGw2HaS8PxesOzrZZB2XEWU3Xj"
+# admin_key = "cdXVNIFzEUbSElTpoVoK4SyRrJ7Zj6n6Y6wgApIc"
+admin_key = os.getenv('ADMIN_API_KEY')
+reg_key = os.getenv('REG_API_KEY')
+# reg_key = "7PRHFkrxE71dpBNGw2HaS8PxesOzrZZB2XEWU3Xj"
 origin_type = "Integration Tests"
 
 npcs_admin = Neuropacs(server_url=server_url, api_key=admin_key, origin_type=origin_type)
