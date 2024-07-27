@@ -1,7 +1,7 @@
 from sdk import Neuropacs
 
 def main():
-    api_key = "IIhgYuScAuztZbWK54km38yc0da9him3Q3wyCuQ3"
+    api_key = ""
     server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.cov/dev"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "JSON"
