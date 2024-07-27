@@ -1,9 +1,12 @@
 name: Integration Tests
 
 on:
-  push:
+  schedule: # Run everyday at 12am EST (4am UTC)
+    - cron: "4 0 * * *"
+  push: # Run on push to main branch
     branches:
       - main
+  workflow_dispatch: # Allow run from Actions tab
 
 jobs:
   test:

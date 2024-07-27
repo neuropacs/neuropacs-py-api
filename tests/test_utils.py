@@ -1,8 +1,24 @@
 import json
-from datetime import datetime
-import base64
+import datetime
 import uuid
+import base64
+import os
 
+
+# CONSTANTS
+server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev"
+invalidServerUrl = "https://invalid.execute-api.us-east-2.amazonaws.com/not_real"
+admin_key = os.getenv('ADMIN_API_KEY')
+invalid_key = "invalidApiKey123"
+reg_key = os.getenv('REG_API_KEY')
+origin_type = "Integration Tests"
+
+invalid_order_id = "invalid_order_id"
+product_id = "PD/MSA/PSP-v1.0"
+invalid_product_id = "not_a_real_product"
+
+
+# HELPER FUNCTIONS
 def is_json(myjson):
     try:
         json_object = json.loads(myjson)
@@ -34,3 +50,14 @@ def is_valid_aes_ctr_key(key):
         return False
     return True
 
+def is_valid_status_obj(status_obj):
+  if status_obj and is_dict(status_obj) and \
+    isinstance(status_obj.get('started'), bool) and \
+    isinstance(status_obj.get('finished'), bool) and \
+    isinstance(status_obj.get('failed'), bool) and \
+    status_obj.get('progress') and \
+    isinstance(status_obj.get('progress'), int) and \
+    status_obj.get('info') and \
+    isinstance(status_obj.get('info'), str):
+        return True
+  return False

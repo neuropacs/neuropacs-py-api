@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import serialization
 class Neuropacs:
     def __init__(self, server_url, api_key, origin_type="API"):
         """
-        NeuroPACS constructor
+        neuropacs constructor
         """
         self.server_url = server_url
         self.api_key = api_key
@@ -51,10 +51,9 @@ class Neuropacs:
         except:
             if not isinstance(plaintext, str):
                 raise Exception({"neuropacsError": "Plaintext must be a string or JSON!"})    
-
     
         # get public key of server
-        PUBLIC_KEY = self.get_public_key()
+        PUBLIC_KEY = self.get_public_key().replace('\\n', '\n').strip()
 
         PUBLIC_KEY = PUBLIC_KEY.encode('utf-8')
 
