@@ -18,13 +18,7 @@ class IntegrationTests(unittest.TestCase):
     # Successful connection
     def test_successful_connection(self):
         conn = npcs_admin.connect()
-        timestamp = conn["timestamp"]
-        connection_id = conn["connection_id"]
-        aes_key = conn["aes_key"]
-        self.assertEqual(test_utils.is_dict(conn), True)
-        self.assertEqual(test_utils.is_valid_timestamp(timestamp), True)
-        self.assertEqual(test_utils.is_valid_uuid4(connection_id), True)
-        self.assertEqual(test_utils.is_valid_aes_ctr_key(aes_key), True)
+        self.assertEqual(test_utils.is_valid_session_obj(conn), True)
 
     # Invalid API key
     def test_invalid_api_key(self):

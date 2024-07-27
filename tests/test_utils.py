@@ -1,5 +1,5 @@
 import json
-import datetime
+from datetime import datetime
 import uuid
 import base64
 import os
@@ -29,9 +29,18 @@ def is_json(myjson):
 def is_dict(value):
     return isinstance(value, dict)
 
+def is_valid_session_obj(conn):
+    if conn and \
+        is_dict(conn) and \
+        is_valid_timestamp(conn.get("timestamp")) and \
+        is_valid_uuid4(conn.get("connection_id")) and \
+        is_valid_aes_ctr_key(conn.get('aes_key')):
+            return True
+    return False
+
 def is_valid_timestamp(date_string):
     try:
-        naive_datetime = datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S %Z")
+        date = datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S %Z")
     except Exception as e:
         return False
     return True
