@@ -1,8 +1,8 @@
 from sdk import Neuropacs
 
 def main():
-    api_key = ""
-    server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.cov/dev"
+    api_key = "" #!DELETE THIS
+    server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "JSON"
 
@@ -39,9 +39,9 @@ def main():
     # status = npcs.check_status("0b183dd2-d07b-4ac9-a558-1dc3d51aea80")
     # print(status)
 
-    # # # # GET RESULTS
-    # results = npcs.get_results(result_format, "TEST")
-    # print(results)
+    # # # GET RESULTS
+    results = npcs.get_results("JSON", "TEST")
+    print(results)
 
     
 

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='neuropacs',
-    version='1.7.8',
+    version='1.7.9',
     description='neuropacs Python API',
     license='MIT',
     long_description=open('README.md').read(),

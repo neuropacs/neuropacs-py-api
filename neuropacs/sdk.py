@@ -805,21 +805,24 @@ class Neuropacs:
 
         :return: AES encrypted file data in specified format
         """
+        print("GETTING RESULTS")
         try:
             if order_id is None:
                 order_id = self.order_id
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
+            format = format.lower()
+
+            validFormats = ["txt", "xml", "json", "png"]
+
+            if format not in validFormats:
+                raise Exception("Invalid format! Valid formats include: \"txt\", \"json\", \"xml\", \"png\".")
+
             body = {
                 'orderId': order_id,
                 'format': format               
             }
-
-            validFormats = ["TXT", "XML", "JSON", "PNG"]
-
-            if format not in validFormats:
-                raise Exception("Invalid format! Valid formats include: \"TXT\", \"JSON\", \"XML\", \"PNG\".")
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
@@ -830,14 +833,10 @@ class Neuropacs:
 
             text = res.text
 
-            if format == "TXT" or format == "XML" or format == "JSON":
+            if format == "txt" or format == "xml" or format == "json":
                 return self.__decrypt_aes_ctr(text, "string")
-            elif format == "PNG":
+            elif format == "png":
                 return self.__decrypt_aes_ctr(text, "bytes")
 
         except Exception as e:
             raise Exception(f"Result retrieval failed: {str(e)}")
-
-
-
-    

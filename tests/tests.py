@@ -39,6 +39,17 @@ class IntegrationTests(unittest.TestCase):
             npcs_reg.run_job(test_utils.product_id, test_utils.invalid_order_id)
         self.assertEqual(str(context.exception),"Job run failed: Bucket not found.")
 
+    # Successful dataset upload
+    def test_successful_dataset_upload(self):
+        npcs_admin.connect()
+        order_id = npcs_admin.new_job()
+        upload_status = npcs_admin.upload_dataset(test_utils.dataset_path_git, order_id=order_id, dataset_id=order_id)
+        dataset_id = upload_status["dataset_id"]
+        state = upload_status["state"]
+        self.assertEqual(test_utils.is_dict(upload_status), True)
+        self.assertEqual(state, "success")
+        self.assertEqual(dataset_id, order_id)
+
     # No connection id in request header
     def test_no_connection(self):
         npcs_reg.connection_id = ""
@@ -57,19 +68,29 @@ class IntegrationTests(unittest.TestCase):
     def test_invalid_order_id_in_status_check(self):
         npcs_admin.connect()
         with self.assertRaises(Exception) as context:
-            order_id = npcs_admin.check_status(order_id="Not_Valid")
+            status = npcs_admin.check_status(order_id="Not_Valid")
         self.assertEqual(str(context.exception),"Status check failed: Bucket not found.")
+
+    # Successful result retrieval in txt format
+    def test_successful_result_retrieval_txt(self):
+        npcs_admin.connect()
+        results = npcs_admin.get_results(order_id="TEST", format="txt")
+        self.assertEqual(test_utils.is_valid_result_txt(results), True)
+
+    # Successful result retrievel in json format
+    def test_successful_result_retrieval_json(self):
+        npcs_admin.connect()
+        results = npcs_admin.get_results(order_id="TEST", format="JSON")
+        self.assertEqual(test_utils.is_valid_result_json(results), True)
+
+    # Invalid result format
+    def test_invalid_format_in_result_retrieval(self):
+        npcs_admin.connect()
+        with self.assertRaises(Exception) as context:
+            results = npcs_admin.get_results(order_id="TEST", format="INVALID")
+        self.assertEqual(str(context.exception),"""Result retrieval failed: Invalid format! Valid formats include: "txt", "json", "xml", "png".""")
         
-    # # Successful dataset upload
-    # def test_successful_dataset_upload(self):
-    #     npcs_admin.connect()
-    #     order_id = npcs_admin.new_job()
-    #     upload_status = npcs_admin.upload_dataset("./tests/test_dataset", order_id=order_id, dataset_id=order_id)
-    #     dataset_id = upload_status["dataset_id"]
-    #     state = upload_status["state"]
-    #     self.assertEqual(test_utils.is_dict(upload_status), True)
-    #     self.assertEqual(state, "success")
-    #     self.assertEqual(dataset_id, order_id)
+
 
     
 if __name__ == '__main__':
