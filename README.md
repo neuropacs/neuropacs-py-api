@@ -4,6 +4,8 @@
 
 Connect to neuropacs™ diagnostic capabilities with our Python API.
 
+## Getting Started
+
 ### Installation
 
 ```bash
@@ -17,7 +19,7 @@ import neuropacs
 
 api_key = "your_api_key"
 server_url = "https://your_neuropacs_url"
-product_id = "PD/MSA/PSP-v1.0"
+product_name = "PD/MSA/PSP-v1.0"
 prediction_format = "XML"
 origin_type = "my_application"
 
@@ -35,12 +37,12 @@ order_id = npcs.new_job()
 
 # UPLOAD A DATASET
 # --> dataset_path must be a valid path to a dataset <String>
-# --> dataset_id param is optional (only will be generated for you if you do not specify it)
+# --> dataset_id param is optional (only will be generated for you if you do not specify it). We recommend using the orderId as the datasetId for simplicity
 upload_status = npcs_admin.upload_dataset("/path/to/dataset/", order_id=order_id, dataset_id=order_id)
 
 # START A JOB
-# --> Valid product_id options: PD/MSA/PSP-v1.0
-job_start_status = npcs.run_job(product_id=product_id, order_id=order_id)
+# --> Valid product_name options: PD/MSA/PSP-v1.0
+job_start_status = npcs.run_job(product_name=product_name, order_id=order_id)
 
 # CHECK JOB STATUS
 job_status = npcs.check_status(order_id=order_id)
