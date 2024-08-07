@@ -5,6 +5,7 @@ def main():
     server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev"
     product_id = "PD/MSA/PSP-v1.0"
     result_format = "JSON"
+    origin_type = "my_application"
 
     # PRINT CURRENT VERSION
     # version = Neuropacs.PACKAGE_VERSION
