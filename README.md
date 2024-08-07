@@ -2,7 +2,7 @@
 
 # neuropacs™ Python API
 
-Connect to neuropacs diagnostic capabilities with our Python API.
+Connect to neuropacs™ diagnostic capabilities with our Python API.
 
 ### Installation
 
