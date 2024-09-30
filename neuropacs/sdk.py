@@ -50,7 +50,7 @@ class Neuropacs:
             plaintext = json.dumps(plaintext)
         except:
             if not isinstance(plaintext, str):
-                raise Exception({"neuropacsError": "Plaintext must be a string or JSON!"})    
+                raise Exception({"neuropacsError": "Plaintext must be a string or JSON!"})   
     
         # get public key of server
         PUBLIC_KEY = self.get_public_key().replace('\\n', '\n').strip()
@@ -60,7 +60,7 @@ class Neuropacs:
         # Deserialize the public key from PEM format
         public_key = serialization.load_pem_public_key(PUBLIC_KEY)
 
-        # Encrypt the plaintext using OAEP padding
+        # Encrypt the plaintext using OAEP
         ciphertext = public_key.encrypt(
             plaintext.encode('utf-8'),
             padding.OAEP(
@@ -446,7 +446,7 @@ class Neuropacs:
                             'progress': progress,
                             'status': "Preprocessing"
                         })
-
+            
             # Start zipping and uploading each chunk
             for chunk in zip_builder_object:
                 # Get upload_id for this chunk
@@ -568,7 +568,7 @@ class Neuropacs:
         """Create a connection with the server
 
         Returns:
-        :returns: Connection object (timestamp, connection_id, order_id)
+        :returns: Connection object (timestamp, connection_id, aes_key)
         """
 
         try:
@@ -624,80 +624,6 @@ class Neuropacs:
             return { "dataset_id": dataset_id_complete, "state": "success" }
         except Exception as e:
             raise Exception(f"Dataset upload failed: {str(e)}")
-
-
-    def validate_upload(self, directory, dataset_id, order_id=None, callback=None):
-        """
-        Validate dataset upload
-
-        :param list directory Path to dataset
-        :param str dataset_id Base64 dataset_id
-        :param str order_id Base64 order_id
-
-        :returns List of missing files
-        """
-        try:
-            if order_id is None:
-                order_id = self.order_id
-
-            file_list = [] # Holds list of files (filename, size)
-
-            total_file_count = 0 # Tracks total number of files in dataset
-
-            for dirpath, _, filenames in os.walk(directory):
-                for filename in filenames:
-                    file_path = os.path.join(dirpath, filename) # Get full file path
-                    size = os.path.getsize(file_path)
-                    file_list.append({'name': filename, 'size': size})
-                    total_file_count +=1
-
-            validation_parts = self.__split_array(file_list, 100)
-
-            encrypted_order_id = self.__encrypt_aes_ctr(order_id, "string", "string")
-        
-            headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
-
-            total_validated = 0 # Total files validated
-
-            total_missing_files = [] # Store list of missing files
-
-            for val in range(len(validation_parts)):
-                body = {
-                    'fileMetadata': validation_parts[val],
-                    'orderId': order_id,
-                    'datasetId': dataset_id
-                }
-
-                encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
-
-                res = requests.post(f"{self.server_url}/api/verifyUpload/", data=encrypted_body, headers=headers)
-            
-                if not res.ok:
-                    raise Exception(json.loads(res.text)["error"])
-
-                text = res.text
-                decrypted_dataset_validation = self.__decrypt_aes_ctr(text, "json")
-                total_missing_files = total_missing_files + decrypted_dataset_validation['missingFiles']
-                total_validated += len(validation_parts[val])
-
-                if callback is not None:
-                    # Calculate progress and round to two decimal places
-                    progress = (total_validated / total_file_count) * 100
-                    progress = round(progress, 2)
-
-                    # Ensure progress is exactly 100 if it's effectively 100
-                    progress = 100 if progress == 100.0 else progress
-                    callback({
-                        'dataset_id': dataset_id,
-                        'progress': progress,
-                        'status': "Validating"
-                    })
-
-            return {'missingFiles': total_missing_files}
-
-        except Exception as e:
-            raise Exception(f"Upload validation failed: {str(e)}")
-
 
     def new_job (self):
         """Create a new order
@@ -805,7 +731,6 @@ class Neuropacs:
 
         :return: AES encrypted file data in specified format
         """
-        print("GETTING RESULTS")
         try:
             if order_id is None:
                 order_id = self.order_id
