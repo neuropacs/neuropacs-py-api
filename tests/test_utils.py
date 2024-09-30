@@ -6,7 +6,7 @@ import os
 
 
 # CONSTANTS
-server_url = "https://sl3tkzp9ve.execute-api.us-east-2.amazonaws.com/dev"
+server_url = "https://aw75e2na5m.execute-api.us-east-1.amazonaws.com/dev"
 invalidServerUrl = "https://invalid.execute-api.us-east-2.amazonaws.com/not_real"
 admin_key = os.getenv('ADMIN_API_KEY')
 invalid_key = "invalidApiKey123"
