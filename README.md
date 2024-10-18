@@ -19,7 +19,7 @@ import neuropacs
 
 api_key = "your_api_key"
 server_url = "https://your_neuropacs_url"
-product_name = "PD/MSA/PSP-v1.0"
+product_name = "Atypical/MSAp/PSP-v1.0"
 prediction_format = "XML"
 origin_type = "my_application"
 
@@ -41,7 +41,7 @@ order_id = npcs.new_job()
 upload_status = npcs_admin.upload_dataset("/path/to/dataset/", order_id=order_id, dataset_id=order_id)
 
 # START A JOB
-# --> Valid product_name options: PD/MSA/PSP-v1.0
+# --> Valid product_name options: Atypical/MSAp/PSP-v1.0
 job_start_status = npcs.run_job(product_name=product_name, order_id=order_id)
 
 # CHECK JOB STATUS

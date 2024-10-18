@@ -14,7 +14,7 @@ reg_key = os.getenv('REG_API_KEY')
 origin_type = "Integration Tests"
 
 invalid_order_id = "invalid_order_id"
-product_id = "PD/MSA/PSP-v1.0"
+product_id = "Atypical/MSAp/PSP-v1.0"
 invalid_product_id = "not_a_real_product"
 
 dataset_path_local = "./test_dataset"
