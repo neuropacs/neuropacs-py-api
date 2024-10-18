@@ -23,9 +23,6 @@ product_name = "Atypical/MSAp/PSP-v1.0"
 prediction_format = "XML"
 origin_type = "my_application"
 
-# PRINT CURRENT VERSION
-version = neuropacs.PACKAGE_VERSION
-
 # INITIALIZE NEUROPACS API
 npcs = neuropacs.init(server_url=server_url, api_key=api_key, origin_type=origin_type)
 
