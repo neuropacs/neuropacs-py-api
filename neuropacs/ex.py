@@ -7,10 +7,6 @@ def main():
     result_format = "JSON"
     origin_type = "example"
 
-    # PRINT CURRENT VERSION
-    version = Neuropacs.PACKAGE_VERSION
-    print(version)
-
     # INITIALIZE NEUROPACS SDK
     npcs = Neuropacs(server_url, api_key, origin_type)
 
