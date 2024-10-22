@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='neuropacs',
-    version='1.8.0',
+    version='1.8.1',
     description='neuropacs Python API',
     license='MIT',
     long_description=open('README.md').read(),
@@ -15,6 +15,7 @@ setup(
         'cryptography>=41.0.1',
         'pycryptodome>=3.20.0',
         'requests>=2.31.0',
+        'urllib3<=1.26.6'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
