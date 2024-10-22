@@ -6,6 +6,7 @@ def main():
     product_id = "Atypical/MSAp/PSP-v1.0"
     result_format = "JSON"
     origin_type = "example"
+    dicom_path = "path/to/dicom"
 
     # INITIALIZE NEUROPACS SDK
     npcs = Neuropacs(server_url, api_key, origin_type)
@@ -19,20 +20,20 @@ def main():
     print(order)
 
     # UPLOAD A DATASET
-    datasetID = npcs.upload_dataset("/Users/kerrickcavanaugh/Desktop/sample data/06_001", order, order, callback=lambda data: print(data))
+    datasetID = npcs.upload_dataset(dicom_path, order, order, callback=lambda data: print(data))
     print(datasetID)
 
     # START A JOB
     job = npcs.run_job(product_id, order)
     print(job)
 
-    # # CHECK STATUS
-    # status = npcs.check_status("")
-    # print(status)
+    # CHECK STATUS
+    status = npcs.check_status(order)
+    print(status)
 
-    # # # # # # GET RESULTS
-    # results = npcs.get_results(result_format, "")
-    # print(results)
+    # GET RESULTS
+    results = npcs.get_results(result_format, order)
+    print(results)
 
     
 
