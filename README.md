@@ -1,4 +1,5 @@
 [![Integration Tests](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml/badge.svg)](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/ci.yml)
+![CodeQL](https://github.com/neuropacs/neuropacs-py-api/actions/workflows/codeql-analysis.yml/badge.svg)
 
 # neuropacs™ Python API
 
