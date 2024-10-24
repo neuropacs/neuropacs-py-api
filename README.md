@@ -18,8 +18,8 @@ pip install neuropacs
 ```py
 import neuropacs
 
-api_key = "your_api_key"
-server_url = "https://your_neuropacs_url"
+api_key = "api_key"
+server_url = "neuropacs_url"
 product_name = "Atypical/MSAp/PSP-v1.0"
 prediction_format = "XML"
 origin_type = "my_application"
