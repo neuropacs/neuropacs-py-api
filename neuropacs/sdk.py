@@ -520,24 +520,6 @@ class Neuropacs:
         except Exception as e:
            raise Exception(f"Dataset upload failed: {str(e)}")
 
-    def __split_array(self, array, part_size):
-        """
-        Split array into part_size pieces for processing.
-        
-        :param str array List to be split
-        :param int part_size Size of each chunk
-
-        :return: List of chunks
-        """
-        if part_size <= 0:
-            raise ValueError("Chunk size must be greater than 0")
-
-        result = []
-        for i in range(0, len(array), part_size):
-            chunk = array[i:i + part_size]
-            result.append(chunk)
-        return result
-
     # Public Methods
 
     def get_public_key(self):
