@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neuropacs™ Python API Wiki</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <img
+          src="/resources/neuropacs_icon.png"
+          alt="neuropacs Logo"
+          class="logo"
+        />
+        <div class="header-text">
+          <h1>neuropacs™ Python API Wiki</h1>
+          <p>
+            Our Python API enables seamless integration with our product's
+            capabilities in any Python-based environment.
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="navbar">
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#products">Available Products</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#usage">Usage</a></li>
+        <li><a href="#contact">Contact</a></li>
+        <li><a href="#license">License</a></li>
+        <!-- <li><a href="#faq">FAQ</a></li> -->
+      </ul>
+    </nav>
+
+    <main class="main-content">
+      <section id="overview">
+        <h2>Overview</h2>
+        <p>
+          Your software is <strong>5 lines away</strong> from accurately
+          diagnosing Parkinson's variations.
+        </p>
+        <p>
+          This wiki provides documentation and examples to guide users in
+          quickly integrating and customizing the SDK to fit various
+          applications.
+        </p>
+        <p>
+          The neuropacs™ system is a software application intended to receive
+          and analyze diffusion MRI data from patients aged 40 years and older
+          presenting with Parkinson's disease (PD) symptoms. The neuropacs™
+          system provides a report to aid neuroradiologists and/or neurologists
+          in identifying patients with Atypical Parkinsonism (i.e., multiple
+          system atrophy Parkinsonian variant (MSAp), or progressive
+          supranuclear palsy (PSP)). The results of the neuropacs™ system are
+          intended to provide supplemental information in conjunction with a
+          standard neurological assessment and other clinical tests.
+          <strong
+            >Patient management decisions should not be made solely on the basis
+            of analysis by the neuropacs™ system.</strong
+          >
+        </p>
+      </section>
+
+      <section id="products">
+        <h2>Available Products</h2>
+        <ul>
+          <li>
+            Atypical/MSAp/PSP-v1.0
+            <p class="subtext">
+              Identify patients with Atypical Parkinsonism (i.e., multiple
+              system atrophy Parkinsonian variant (MSAp), or progressive
+              supranuclear palsy (PSP)).
+            </p>
+          </li>
+        </ul>
+      </section>
+
+      <section id="installation">
+        <h2>Installation</h2>
+        <p>Install the neuropacs module using the following command:</p>
+        <pre class="code-container"><code class="language-shell">
+    pip install neuropacs
+        </code></pre>
+      </section>
+
+      <section id="usage">
+        <h2>Usage</h2>
+        <h3>Initialization</h3>
+        <pre class="code-container"><code class="language-shell">
+    <span class="code-comment"># Import the neuropacs module</span>
+    <span class="code-keyword">import</span> neuropacs
+
+    <span class="code-comment"># Define neuropacs parameters</span>
+    api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
+    server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
+    product_name = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
+    prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results</span>
+    origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
+
+    <span class="code-comment"># Initialize the API</span>
+    npcs = neuropacs.<span class="code-function">init</span>(server_url=server_url, api_key=api_key, origin_type=origin_type)
+        </code></pre>
+        <h3>Example</h3>
+        <pre class="code-container"><code class="language-python">
+    <span class="code-comment"># Create a neuropacs™ session</span>
+    conn = npcs.<span class="code-function">connect()</span>
+
+    <span class="code-comment"># Create a new order</span>
+    order_id = npcs.<span class="code-function">new_job()</span>
+
+    <span class="code-comment"># Upload a dataset</span>
+    upload = npcs.<span class="code-function">upload_dataset</span>(<span class="code-string">"/path/to/dataset/"</span>, order_id=order_id, dataset_id=order_id, callback=<span class="code-keyword">lambda</span> data: print(data))
+
+    <span class="code-comment"># Start an order</span>
+    order_start = npcs.<span class="code-function">run_job</span>(product_name=product_name, order_id=order_id)
+
+    <span class="code-comment"># Check order status</span>
+    status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
+
+    <span class="code-comment"># Retrieve job results</span>
+    results = npcs.<span class="code-function">get_results</span>(prediction_format=prediction_format, order_id=order_id)
+        </code></pre>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>
+          Kerrick Cavanaugh (<em>Lead Software Engineer</em>) -
+          kerrick@neuropacs.com
+        </p>
+      </section>
+
+      <section id="license">
+        <h2>License</h2>
+        <p>
+          This project is licensed under the
+          <a
+            href="https://github.com/neuropacs/neuropacs-py-api/blob/main/LICENSE"
+            target="_blank"
+            >MIT</a
+          >.
+        </p>
+      </section>
+
+      <!-- <section id="faq">
+        <h2>FAQ</h2>
+        <p><strong>Q1:</strong> How do I contribute to this project?</p>
+        <p>
+          <strong>A1:</strong> Fork the repository and submit a pull request.
+        </p>
+      </section> -->
+    </main>
+
+    <footer class="footer">
+      <p>&copy; 2024 neuropacs™. All rights reserved.</p>
+    </footer>
+  </body>
+</html>
