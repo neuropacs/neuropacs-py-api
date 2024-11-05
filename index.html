@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>neuropacs™ Python API</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1>neuropacs™ Python API</h1>
+          <p>
+            Our Python API enables seamless integration with our product's
+            capabilities in any Python-based environment.
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="navbar">
+      <ul>
+        <li><a href="https://neuropacs.github.io/">Home</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#usage">Usage</a></li>
+        <li><a href="#contact">Contact</a></li>
+        <li><a href="#license">License</a></li>
+        <li><a href="#explore">Explore</a></li>
+        <!-- <li><a href="#faq">FAQ</a></li> -->
+      </ul>
+    </nav>
+
+    <div class="image-row">
+      <a href="https://github.com/neuropacs/neuropacs-py-api"
+        ><img src="./resources/github_logo.png"
+      /></a>
+      <a href="https://pypi.org/project/neuropacs/"
+        ><img src="./resources/pip_logo.png"
+      /></a>
+    </div>
+
+    <main class="main-content">
+      <section id="installation">
+        <h2>Installation</h2>
+        <p>Install the neuropacs module using the following command:</p>
+        <pre
+          class="code-container"
+        ><code class="language-shell">pip install neuropacs</code></pre>
+      </section>
+
+      <section id="usage">
+        <h2>Usage</h2>
+        <h3>Initialization</h3>
+        <pre class="code-container"><code class="language-shell">
+    <span class="code-comment"># Import the neuropacs module</span>
+    <span class="code-keyword">import</span> neuropacs
+
+    <span class="code-comment"># Define neuropacs parameters</span>
+    api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
+    server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
+    product_name = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
+    prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results</span>
+    origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
+
+    <span class="code-comment"># Initialize the API</span>
+    npcs = neuropacs.<span class="code-function">init</span>(server_url=server_url, api_key=api_key, origin_type=origin_type)
+        </code></pre>
+        <h3>Example</h3>
+        <pre class="code-container"><code class="language-python">
+    <span class="code-comment"># Create a session</span>
+    conn = npcs.<span class="code-function">connect()</span>
+
+    <span class="code-comment"># Create a new order</span>
+    order_id = npcs.<span class="code-function">new_job()</span>
+
+    <span class="code-comment"># Upload a dataset</span>
+    upload = npcs.<span class="code-function">upload_dataset</span>(<span class="code-string">"/path/to/dataset/"</span>, order_id=order_id, dataset_id=order_id, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
+
+    <span class="code-comment"># Start an order</span>
+    order_start = npcs.<span class="code-function">run_job</span>(product_name=product_name, order_id=order_id)
+
+    <span class="code-comment"># Check order status</span>
+    status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
+
+    <span class="code-comment"># Retrieve job results</span>
+    results = npcs.<span class="code-function">get_results</span>(prediction_format=prediction_format, order_id=order_id)
+        </code></pre>
+      </section>
+
+      <section id="contact">
+        <h2>Contact</h2>
+        <p>
+          Kerrick Cavanaugh (<em>Lead Software Engineer</em>) -
+          kerrick@neuropacs.com
+        </p>
+      </section>
+
+      <section id="license">
+        <h2>License</h2>
+        <p>
+          This project is licensed under the
+          <a
+            href="https://github.com/neuropacs/neuropacs-py-api/blob/main/LICENSE"
+            target="_blank"
+            >MIT</a
+          >.
+        </p>
+      </section>
+
+      <section id="explore">
+        <h2>Explore</h2>
+        <h3>Integrations</h3>
+        <p>
+          Explore the different systems and software that our product integrates
+          with. Click each integration for detailed setup and usage
+          instructions.
+        </p>
+        <ul class="integration-list">
+          <li>
+            <a href="https://neuropacs.github.io/SlicerNeuropacs/">3D Slicer</a>
+          </li>
+          <!-- <li><a href="weasis.html">Weasis DICOM Viewer</a></li> -->
+        </ul>
+        <h3>Supported Programming Languages</h3>
+        <p>
+          Our product supports various programming languages to offer
+          flexibility in development. Click each language for APIs, libraries,
+          and examples.
+        </p>
+        <ul class="language-list">
+          <li>
+            <a href="https://neuropacs.github.io/neuropacs-js-api/"
+              >JavaScript API</a
+            >
+          </li>
+          <li>
+            <a href="https://neuropacs.github.io/neuropacs-java-api/"
+              >Java API</a
+            >
+          </li>
+          <li>
+            <a href="https://neuropacs.github.io/neuropacs-cli/">CLI</a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- <section id="faq">
+        <h2>FAQ</h2>
+        <p><strong>Q1:</strong> How do I contribute to this project?</p>
+        <p>
+          <strong>A1:</strong> Fork the repository and submit a pull request.
+        </p>
+      </section> -->
+    </main>
+
+    <footer class="footer">
+      <p>&copy; 2024 neuropacs™. All rights reserved.</p>
+    </footer>
+  </body>
+</html>
