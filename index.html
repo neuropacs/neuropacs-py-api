@@ -75,7 +75,7 @@
     order_id = npcs.<span class="code-function">new_job()</span>
 
     <span class="code-comment"># Upload a dataset</span>
-    upload = npcs.<span class="code-function">upload_dataset</span>(<span class="code-string">"/path/to/dataset/"</span>, order_id=order_id, dataset_id=order_id, callback=<span class="code-keyword">lambda</span> data: print(data))
+    upload = npcs.<span class="code-function">upload_dataset</span>(<span class="code-string">"/path/to/dataset/"</span>, order_id=order_id, dataset_id=order_id, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
 
     <span class="code-comment"># Start an order</span>
     order_start = npcs.<span class="code-function">run_job</span>(product_name=product_name, order_id=order_id)
