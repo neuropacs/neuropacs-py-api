@@ -86,6 +86,20 @@
     <span class="code-comment"># Retrieve job results</span>
     results = npcs.<span class="code-function">get_results</span>(prediction_format=prediction_format, order_id=order_id)
         </code></pre>
+        <h3>Example viewing a PNG result</h3>
+        <pre class="code-container"><code class="language-python">
+    <span class="code-comment"># Import pillow</span> 
+    from PIL import Image
+
+    <span class="code-comment"># Retrieve job results in PNG</span>
+    results = npcs.<span class="code-function">get_results</span>(prediction_format=<span class="code-string">"PNG"</span>, order_id=order_id)
+
+    <span class="code-comment"># Create an image object from bytes</span>
+    image = Image.<span class="code-function">open</span>(results)
+
+    <span class="code-comment"># Display the image</span>
+    image.<span class="code-function">show</span>()
+        </code></pre>
       </section>
 
       <section id="contact">
