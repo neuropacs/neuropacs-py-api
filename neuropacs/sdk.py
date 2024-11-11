@@ -6,8 +6,10 @@ from Crypto.Util.Padding import pad
 import base64
 import zipfile
 import io
+from requests_toolbelt.multipart import decoder
 import uuid
 from datetime import datetime
+from dicomweb_client.api import DICOMwebClient
 from Crypto.Cipher import AES
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -22,10 +24,10 @@ class Neuropacs:
         self.server_url = server_url
         self.api_key = api_key
         self.origin_type = origin_type
-        self.connection_id = ""
-        self.aes_key = ""
-        self.dataset_upload = False
-        self.files_uploaded = 0
+        self.connection_id = None
+        self.aes_key = None
+        self.order_id = None
+        self.max_zip_size = 15 * 1024 * 1024 # 15MB max zip file size
 
     # Private methods
     def __generate_aes_key(self):
@@ -138,7 +140,7 @@ class Neuropacs:
         """AES CTR decrypt ciphertext.
 
         :param str ciphertext: Ciphertext to be decrypted.
-        :param * format_out: Format of plaintext. Default to "string".
+        :param str format_out: Format of plaintext. Default to "string".
 
         :return: Plaintext in requested format_out.
         """
@@ -336,9 +338,13 @@ class Neuropacs:
                 upload_res = requests.put(presigned_url, data=part_data)
 
                 if not upload_res.ok:
+                    print(upload_res.text)
+                    print(upload_res.status_code)
                     fail = True
                 else:
                     e_tag = upload_res.headers.get('ETag')
+                    if e_tag == None:
+                        continue
                     return e_tag
 
             if fail:
@@ -366,159 +372,8 @@ class Neuropacs:
         except Exception as error:
             raise Exception(f"Partitioning blob failed: {str(error)}")
 
-    def __attempt_upload_dataset(self, directory, order_id=None, dataset_id=None, callback=None):
-        """Upload a dataset to the server
 
-        :param str directory: Path to dataset folder to be uploaded.
-        :param str order_id: Base64 order_id
-        :param str dataset_id: Base64 dataset_id
-        :param str callback: Function to be called after every upload
-
-        :return: Upload status code.
-        """
-        try:
-            if isinstance(directory,str):
-                if not os.path.isdir(directory):
-                    raise Exception("Path not a directory") 
-            else:
-                raise Exception("Path must be a string") 
-
-            if order_id is None:
-                order_id = self.order_id
-
-            if dataset_id is None:
-                dataset_id = self.__generate_unique_uuid()
-
-            zip_builder_object = {} # Object of chunks, each value is an array of files
-
-            # Calculate number of files in the directory
-            total_files = 0 
-            for dirpath, _, filenames in os.walk(directory):
-                for filename in filenames:
-                    file_path = os.path.join(dirpath, filename) # Get full file path
-                    if os.path.isfile(file_path):
-                        total_files += 1
-
-            files_processed = 0
-
-            max_zip_size = 50000000 # Max size of zip file (5MB)
-            total_parts = 0 # Counts total parts the dataset is divided into
-            cur_zip_size = 0 # Counts size of current zip file
-            zip_index = 0 # Counts index of zip file
-
-            file_set = set() # Tracks exisitng file names
-
-            for dirpath, _, filenames in os.walk(directory):
-                for filename in filenames:
-                    file_path = os.path.join(dirpath, filename) # Get full file path
-                    # Throw error if not a file
-                    if not os.path.isfile(file_path):
-                        raise Exception(f"Object {file_path} is not a file.")
-
-                    cur_zip_size += os.path.getsize(file_path) # Increment current file set size
-
-                    # Create list at zipIndex if it does not already exist
-                    if zip_index not in zip_builder_object:
-                        zip_builder_object[zip_index] = []
-                        total_parts += 1
-
-                    unqiue_filename = self.__ensure_unique_name(file_set, filename)
-                
-                    # Push file to the list at zipIndex 
-                    zip_builder_object[zip_index].append({"filename": unqiue_filename, "path": file_path})
-
-                    # If current chunk size is larger than max, start next chunk
-                    if cur_zip_size > max_zip_size:
-                        zip_index += 1
-                        cur_zip_size = 0
-
-                    files_processed += 1 # Increment number of processed files
-
-                    if callback is not None:
-                        # Calculate progress and round to two decimal places
-                        progress = (files_processed / total_files) * 100
-                        progress = round(progress, 2)
-
-                        # Ensure progress is exactly 100 if it's effectively 100
-                        progress = 100 if progress == 100.0 else progress
-                        callback({
-                            'dataset_id': dataset_id,
-                            'progress': progress,
-                            'status': "Preprocessing"
-                        })
-            
-            # Start zipping and uploading each chunk
-            for chunk in zip_builder_object:
-                # Get upload_id for this chunk
-                upload_id = self.__new_multipart_upload(dataset_id, chunk, order_id)
-
-                # BytesIO object to hold the ZIP file in memory
-                zip_buffer = io.BytesIO()
-
-                # Create a write stream into the zip file
-                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                    cur_chunk = zip_builder_object[chunk]
-                    # For each file in the chunk, add to zip buffer
-                    for file in range(len(cur_chunk)):
-                        filename = cur_chunk[file]['filename']
-                        path = cur_chunk[file]['path']
-                        file_contents = self.__read_file_contents(path)
-                        zip_file.writestr(filename, file_contents)
-                        # Call progress callback
-                        if callback is not None:
-                            # Calculate progress and round to two decimal places
-                            progress = ((file+1) / len(cur_chunk)) * 100
-                            total_progress = round(
-                                (100 / (2 * total_parts)) *
-                                (2 * (chunk + 1 - 1) + progress / 100)
-                                ,2)
-                            callback({
-                                'dataset_id': dataset_id,
-                                'progress': total_progress,
-                                'status': f"Compressing part {chunk+1}/{total_parts}"
-                            })
-
-                # Seek to the beginning of the BytesIO object before reading
-                zip_buffer.seek(0)
-
-                # Get zip file contents in memory
-                zip_file_contents = zip_buffer.getvalue()
-
-                part_size = 5 * 1024 * 1024 # 5MB minimum part size
-
-                # Break zip contents into chunks of part_size
-                zip_parts = self.__split_zip_contents(zip_file_contents, part_size)
-
-                final_parts = [] # Holds part details for complete multi upload
-
-                for up in range(len(zip_parts)):
-                    e_tag = self.__upload_part(upload_id, dataset_id, chunk, order_id, up+1, zip_parts[up])
-
-                    final_parts.append({'PartNumber': up+1, 'ETag': e_tag})
-
-                    # Call progress callback
-                    if callback is not None:
-                        # Calculate progress and round to two decimal places
-                        progress = ((up+1) / len(zip_parts)) * 100
-                        total_progress = round(
-                            (100 / (2 * total_parts)) *
-                            (2 * (chunk + 1 - 1) + 1 + progress / 100)
-                            ,2)
-
-                        # Ensure progress is exactly 100 if it's effectively 100
-                        total_progress = 100 if total_progress == 100.0 else total_progress
-                        callback({
-                            'dataset_id': dataset_id,
-                            'progress': total_progress,
-                            'status': f"Uploading part {chunk+1}/{total_parts}"
-                        })
-
-                self.__complete_multipart_upload(order_id, dataset_id, str(chunk), upload_id, final_parts)
-
-            return dataset_id
-
-        except Exception as e:
-           raise Exception(f"Dataset upload failed: {str(e)}")
+        
 
     # Public Methods
 
@@ -585,34 +440,341 @@ class Neuropacs:
                 "aes_key": aes_key,
             }
         except Exception as e:
-            raise Exception(f"Connection creation failed: {str(e)}")
-            
+            raise Exception(f"Connection failed: {str(e)}")
+
+    def upload_dataset_from_path(self, order_id=None, path=None, callback=None):
+        """Upload a dataset from a file path
+
+        :param str order_id: Unique base64 identifier for the order.
+        :param str path: Path to dataset folder to be uploaded (ex. "/path/to/dicom").   
+        :param function callback: Callback function invoked with upload progress.
+
+        :return: Boolean indicating upload status.
+        """
+
+        try:
+            if(order_id is None or path is None):
+                raise Exception("Paramter is missing")
+
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
+
+            if isinstance(path,str):
+                if not os.path.isdir(path):
+                    raise Exception("Path not a directory") 
+            else:
+                raise Exception("Path must be a string") 
+
+            # Calculate number of files in the directory
+            total_files = 0 
+            for dirpath, _, filenames in os.walk(path):
+                for filename in filenames:
+                    file_path = os.path.join(dirpath, filename) # Get full file path
+                    if os.path.isfile(file_path):
+                        total_files += 1
+
+            cur_zip_size = 0 # Counts size of current zip file
+            part_index = 1 # Counts index of zip file
+            files_uploaded = 0 # Track number of files uploaded
+            filename_set = set() # Tracks exisitng file names
+
+            # BytesIO object to hold the ZIP file in memory
+            zip_buffer = io.BytesIO()
+
+            # Create a write stream into the zip file
+            zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
+
+            for dirpath, _, filenames in os.walk(path):
+                for filename in filenames:
+                    # Get full file path
+                    file_path = os.path.join(dirpath, filename)
+
+                    # Get file size
+                    file_size = os.path.getsize(file_path)
+
+                    # Throw error if not a file
+                    if not os.path.isfile(file_path):
+                        raise Exception(f"Object {file_path} is not a file.")
+
+                    # Generate a unique filename
+                    unqiue_filename = self.__ensure_unique_name(filename_set, filename)
+
+                    # Get file contents in bytes
+                    file_contents = self.__read_file_contents(file_path)
+
+                    # If next chunk size will be larger than max, start next chunk
+                    next_zip_size = cur_zip_size + file_size
+                    if next_zip_size > self.max_zip_size:                        
+                        # Close the zip file
+                        zip_file.close()
+                        zip_buffer.seek(0)
+
+                        # Get zip file contents in memory
+                        zip_file_contents = zip_buffer.getvalue()
+
+                        # Get zip index
+                        zip_index = part_index - 1
+
+                        # Start new mulitpart upload
+                        upload_id = self.__new_multipart_upload(order_id, str(zip_index), order_id)
+
+                        # Upload part
+                        e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_index, zip_file_contents)
+
+                        # Complete mulitpart upload
+                        self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}])
+
+                        # Clear buffer and reset zip file
+                        zip_buffer.seek(0)
+                        zip_buffer.truncate(0)
+                        zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
+
+                        cur_zip_size = 0
+
+                        # Increment part number
+                        part_index += 1
+                    
+                    # Write file to zip
+                    zip_file.writestr(unqiue_filename, file_contents)
+
+                    # Increment zip file size
+                    cur_zip_size += file_size
+
+                    # Increment files uploaded
+                    files_uploaded += 1
+
+                    # Update callback
+                    if callback is not None:
+                        # Calculate progress and round to two decimal places
+                        progress = (files_uploaded / total_files) * 100
+                        progress = round(progress, 2)
+
+                        # Ensure progress is exactly 100 if it's effectively 100
+                        progress = 100 if progress == 100.0 else progress
+                        callback({
+                            'order_id': order_id,
+                            'progress': progress,
+                            'status': f"Uploading file {files_uploaded}/{total_files}"
+                        })
 
 
-    def upload_dataset(self, directory, order_id=None, dataset_id=None, callback=None):
-        """Upload a dataset to the server
+            if(cur_zip_size > 0):
+                # Upload remaining files in zip_buffer
+                # Close the zip file
+                zip_file.close()
+                zip_buffer.seek(0)
 
-        :param str directory: Path to dataset folder to be uploaded.
-        :param str order_id: Base64 order_id
-        :param str dataset_id: Base64 dataset_id
-        :param str callback: Function to be called after every upload
+                # Get zip file contents in memory
+                zip_file_contents = zip_buffer.getvalue()
 
-        :return: Upload status code.
+                # Get zip index
+                zip_index = part_index - 1
+
+                # Get upload_id for multipart upload
+                upload_id = self.__new_multipart_upload(order_id, str(zip_index), order_id)
+
+                # Upload the zip file
+                e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_index, zip_file_contents)
+
+                # Complete multipart upload
+                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}])
+
+            # Close the zip file if it's still open
+            if zip_file.fp is not None:
+                zip_file.close()
+
+            return True
+
+        except Exception as e:
+           raise Exception(f"Error uploading dataset from path: {str(e)}")
+
+
+    def upload_dataset_from_dicom_web(self, order_id=None, dicom_web_base_url=None, study_uid=None, username=None, password=None, callback=None):
+        """
+        Retrieve a DICOM study from a DICOMweb server and upload.
+
+        :param str order_id: Unique base64 identifier for the order.
+        :param str dicom_web_base_url: Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dicomweb')
+        :param str study_uid: Unique Study Instance UID of the study to be retrieved.
+        :param str username: Username for basic authentication (if required).
+        :param str password: Password for basic authentication (if required).
+        :param function callback: Callback function invoked with upload progress.
+
+        :return: Boolean indicating upload status.
         """
         try:
-            # Attempt upload
-            dataset_id_complete = self.__attempt_upload_dataset(directory, order_id, dataset_id, callback)
-            # Return result
-            return { "dataset_id": dataset_id_complete, "state": "success" }
+            if order_id is None or dicom_web_base_url is None or study_uid is None:
+                raise Exception("Parameter is missing")
+
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
+
+            # Create a DICOMwebClient instance
+            if(username is not None and password is not None):
+                # w/ auth
+                client = DICOMwebClient(
+                    url=dicom_web_base_url,
+                    username=username,
+                    password=password
+                )
+            else:
+                # w/out auth
+                client = DICOMwebClient(
+                    url=dicom_web_base_url
+                )
+
+            # Update callback
+            if callback is not None:
+                callback({
+                    'order_id': order_id,
+                    'progress': 0,
+                    'status': f"Retrieving instances from DICOMweb for study {study_uid}"
+                })
+
+            # Retrieve all instances within the study as Datasets
+            instances = client.retrieve_study(study_instance_uid=study_uid)
+
+            if instances is None or len(instances) == 0:
+                raise Exception(f"No instances recieved from DICOMweb for study {study_uid}")
+
+            # Update callback
+            if callback is not None:
+                callback({
+                    'order_id': order_id,
+                    'progress': 100,
+                    'status': f"Retrieving instances from DICOMweb for study {study_uid}"
+                })
+
+            # Track current zip file size
+            cur_zip_size = 0
+
+            # BytesIO object to hold the ZIP file in memory
+            zip_buffer = io.BytesIO()
+
+            # Create a write stream into the zip file
+            zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
+
+            # Total number of instances
+            total_instances = len(instances)
+
+            # Track current part number
+            part_number = 1
+
+            # Track total files uploaded
+            instances_uploaded = 0
+
+            # Iterate through instances
+            for i, instance in enumerate(instances):
+                # Serialize the instance to bytes
+                buffer = io.BytesIO()
+                instance.save_as(buffer)
+                data_bytes = buffer.getvalue()
+                buffer.close()
+
+                # Get the file size
+                cur_file_size = len(data_bytes)
+
+                # Generate a unique filename for the current file
+                unique_filename = self.__generate_unique_uuid()
+
+                # Check if max size exceeded
+                next_zip_size = cur_zip_size + cur_file_size
+
+                # If max size exceeded OR on last file, upload
+                if next_zip_size > self.max_zip_size:
+                    # Close the zip file
+                    zip_file.close()
+                    zip_buffer.seek(0)
+
+                    # Get zip file contents in memory
+                    zip_file_contents = zip_buffer.getvalue()
+
+                    # Get zip index
+                    zip_index = part_number - 1
+
+                    # Get upload_id for multipart upload
+                    upload_id = self.__new_multipart_upload(order_id, str(zip_index), order_id)
+
+                    # Upload the zip file
+                    e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_number, zip_file_contents)
+
+                    # Complete multipart upload
+                    self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}])
+
+                    # Clear buffer and reset cur_zip_size
+                    zip_buffer.seek(0)
+                    zip_buffer.truncate(0)
+                    zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
+
+                    # Reset zip size
+                    cur_zip_size = 0
+
+                    # Increment part number
+                    part_number += 1
+
+            
+                # Add the current instance to the zip
+                zip_file.writestr(unique_filename, data_bytes)
+
+                # Increment zip size
+                cur_zip_size += cur_file_size
+
+                # Incremennt instances uploaded 
+                instances_uploaded += 1
+
+                # Update callback
+                if callback is not None:
+                    # Calculate progress and round to two decimal places
+                    progress = (instances_uploaded / total_instances) * 100
+                    progress = round(progress, 2)
+
+                    # Ensure progress is exactly 100 if it's effectively 100
+                    progress = 100 if progress == 100.0 else progress
+                    callback({
+                        'order_id': order_id,
+                        'progress': progress,
+                        'status': f"Uploading instance {instances_uploaded}/{total_instances}"
+                    })
+
+            if cur_zip_size > 0:
+                # Upload remaining files in zip_buffer
+                # Close the zip file
+                zip_file.close()
+                zip_buffer.seek(0)
+
+                # Get zip file contents in memory
+                zip_file_contents = zip_buffer.getvalue()
+
+                # Get zip index
+                zip_index = part_number - 1
+
+                # Get upload_id for multipart upload
+                upload_id = self.__new_multipart_upload(order_id, str(zip_index), order_id)
+
+                # Upload the zip file
+                e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_number, zip_file_contents)
+
+                # Complete multipart upload
+                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}])
+
+            # Close the zip file if it's still open
+            if zip_file.fp is not None:
+                zip_file.close()
+
+            return True
+
         except Exception as e:
-            raise Exception(f"Dataset upload failed: {str(e)}")
+            raise Exception(f"Error uploading dataset from DICOMweb: {str(e)}")
 
     def new_job (self):
         """Create a new order
 
-        :return: Base64 string order_id.
+        :return: Unique base64 identifier for the order.
         """
         try:
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
+
             headers = {'Content-type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             res = requests.get(f"{self.server_url}/api/newJob/", headers=headers)
@@ -630,22 +792,22 @@ class Neuropacs:
         except Exception as e:
             raise Exception(f"Job creation failed: {str(e)}")
            
-
-
-    def run_job(self, product_name, order_id=None):
+    def run_job(self, order_id=None, product_name=None):
         """Run a job
         
+        :prarm str order_id: Unique base64 identifier for the order.
         :param str product_name: Product to be executed.
-        :prarm str order_id: Base64 order_id 
-        :prarm str dataset_id: Base64 dataset_id 
+        
         
         :return: Job run status code.
         """
 
         try:
-
-            if order_id == None:
-                order_id = self.order_id
+            if order_id == None or product_name is None:
+                raise Exception("Parameter is missing")
+    
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
@@ -666,20 +828,19 @@ class Neuropacs:
         except Exception as e:
             raise Exception(f"Job run failed: {str(e)}")
   
-
-
     def check_status(self, order_id=None):
-        """Check job status
+        """Check job status for a specified order
 
-        :param str order_id: Base64 order_id (optional)
-        :param str dataset_id: Base64 dataset_id (optional)
+        :param str order_id: Unique base64 identifier for the order.
 
-        :return: Job status message.
+        :return: Job status message in JSON.
         """
-        if order_id is None:
-            order_id = self.order_id
-
         try:
+            if order_id is None:
+                raise Exception("Parameter is missing")
+
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
@@ -701,21 +862,21 @@ class Neuropacs:
             
         except Exception as e:
             raise Exception(f"Status check failed: {str(e)}")
- 
 
+    def get_results(self, order_id=None, format=None):
+        """Get job results for a specified order in a specified format
 
-    def get_results(self, format, order_id=None):
-        """Get job results
-
-        :param str format: Format of file data
-        :prarm str order_id: Base64 order_id (optional)
-        :param str dataset_id: Base64 dataset_id
-
-        :return: AES encrypted file data in specified format
+        :prarm str order_id: Unique base64 identifier for the order.
+        :param str format: Format of file data ('txt'/'xml'/'json'/'png')
+        
+        :return: Result data in specified format
         """
         try:
-            if order_id is None:
-                order_id = self.order_id
+            if order_id is None or format is None:
+                raise Exception("Parameter is missing")
+
+            if(self.connection_id is None or self.aes_key is None):
+                raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
@@ -724,7 +885,7 @@ class Neuropacs:
             validFormats = ["txt", "xml", "json", "png"]
 
             if format not in validFormats:
-                raise Exception("Invalid format! Valid formats include: \"txt\", \"json\", \"xml\", \"png\".")
+                raise Exception("Invalid format.")
 
             body = {
                 'orderId': order_id,

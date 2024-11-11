@@ -8,5 +8,7 @@ pycparser==2.22
 pycryptodome==3.21.0
 PyYAML==6.0.2
 requests==2.32.3
+requests-toolbelt==1.0.0
 shellescape==3.8.1
 urllib3==1.26.6
+dicomweb-client==0.59.3

@@ -11,7 +11,9 @@ invalidServerUrl = "https://invalid.execute-api.us-east-2.amazonaws.com/not_real
 admin_key = os.getenv('ADMIN_API_KEY')
 invalid_key = "invalidApiKey123"
 reg_key = os.getenv('REG_API_KEY')
-origin_type = "Integration Tests"
+no_usages_remaining_api_key = os.getenv('NO_USAGES_REMAINING_API_KEY')
+origin_type = "Python Integration Tests"
+
 
 invalid_order_id = "invalid_order_id"
 product_id = "Atypical/MSAp/PSP-v1.0"
@@ -19,6 +21,8 @@ invalid_product_id = "not_a_real_product"
 
 dataset_path_local = "./test_dataset"
 dataset_path_git = "./tests/test_dataset"
+dataset_path_local_single = "./test_dataset_single"
+dataset_path_git_single = "./tests/test_dataset_single"
 
 
 # HELPER FUNCTIONS

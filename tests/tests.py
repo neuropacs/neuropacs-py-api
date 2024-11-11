@@ -1,11 +1,13 @@
 import unittest
 import test_utils
-from neuropacs.sdk import Neuropacs
+import neuropacs
+# import sdk
 
-npcs_admin = Neuropacs(server_url=test_utils.server_url, api_key=test_utils.admin_key, origin_type=test_utils.origin_type)
-npcs_reg = Neuropacs(server_url=test_utils.server_url, api_key=test_utils.reg_key, origin_type=test_utils.origin_type)
-npcs_invalid_key = Neuropacs(server_url=test_utils.server_url, api_key=test_utils.invalid_key, origin_type=test_utils.origin_type)
-npcs_invalid_url = Neuropacs(server_url=test_utils.invalidServerUrl, api_key=test_utils.reg_key, origin_type=test_utils.origin_type)
+npcs_admin = neuropacs.init(server_url=test_utils.server_url, api_key=test_utils.admin_key, origin_type=test_utils.origin_type)
+npcs_reg = neuropacs.init(server_url=test_utils.server_url, api_key=test_utils.reg_key, origin_type=test_utils.origin_type)
+npcs_invalid_key = neuropacs.init(server_url=test_utils.server_url, api_key=test_utils.invalid_key, origin_type=test_utils.origin_type)
+npcs_no_usages = neuropacs.init(server_url=test_utils.server_url, api_key=test_utils.no_usages_remaining_api_key, origin_type=test_utils.origin_type)
+npcs_invalid_url = neuropacs.init(server_url=test_utils.invalidServerUrl, api_key=test_utils.reg_key, origin_type=test_utils.origin_type)
 
 class IntegrationTests(unittest.TestCase):
 
@@ -24,7 +26,7 @@ class IntegrationTests(unittest.TestCase):
     def test_invalid_api_key(self):
         with self.assertRaises(Exception) as context:
             npcs_invalid_key.connect()
-        self.assertEqual(str(context.exception),"Connection creation failed: API key not found.")
+        self.assertEqual(str(context.exception),"Connection failed: API key not found.")
 
     # Successful order creation
     def test_successful_order_creation(self):
@@ -32,37 +34,61 @@ class IntegrationTests(unittest.TestCase):
         order_id = npcs_admin.new_job()
         self.assertEqual(test_utils.is_valid_uuid4(order_id), True)
 
-    # Invalid order id
-    def test_invalid_order_id(self):
-        npcs_reg.connect()
+
+    # Missing connnection parameters
+    def test_missing_connection_parameters(self):
         with self.assertRaises(Exception) as context:
-            npcs_reg.run_job(test_utils.product_id, test_utils.invalid_order_id)
-        self.assertEqual(str(context.exception),"Job run failed: Bucket not found.")
+            npcs_admin.connection_id = None
+            npcs_admin.aes_key = None
+            npcs_admin.new_job()
+        self.assertEqual(str(context.exception),"Job creation failed: Missing session parameters, start a new session with 'connect()' and try again.")
 
     # Successful dataset upload
     def test_successful_dataset_upload(self):
         npcs_admin.connect()
         order_id = npcs_admin.new_job()
-        upload_status = npcs_admin.upload_dataset(test_utils.dataset_path_git, order_id=order_id, dataset_id=order_id)
-        dataset_id = upload_status["dataset_id"]
-        state = upload_status["state"]
-        self.assertEqual(test_utils.is_dict(upload_status), True)
-        self.assertEqual(state, "success")
-        self.assertEqual(dataset_id, order_id)
+        upload_status = npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git)
+        self.assertEqual(upload_status, True)
 
-    # No connection id in request header
-    def test_no_connection(self):
-        npcs_reg.connection_id = ""
+    # Successful job run
+    def test_successful_job_run(self):
+        npcs_admin.connect()
+        order_id = npcs_admin.new_job()
+        upload_status = npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
+        job = npcs_admin.run_job(order_id=order_id, product_name=test_utils.product_id)
+        self.assertEqual(upload_status, True)
+        self.assertEqual(job, 202)
+
+    # Invalid order id
+    def test_invalid_order_id(self):
+        npcs_reg.connect()
         with self.assertRaises(Exception) as context:
-            npcs_reg.new_job()
-        self.assertEqual(str(context.exception),"Job creation failed: No connection ID in request header.")
+            npcs_reg.run_job(test_utils.invalid_order_id, test_utils.product_id)
+        self.assertEqual(str(context.exception),"Job run failed: Bucket not found.")
+
+    # No API key usages remaining
+    def test_no_api_key_usages_remaining(self):
+        with self.assertRaises(Exception) as context:
+            npcs_no_usages.connect()
+            order_id = npcs_no_usages.new_job()
+            npcs_no_usages.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
+            npcs_no_usages.run_job(order_id=order_id, product_name=test_utils.product_id)
+        self.assertEqual(str(context.exception),"Job run failed: No API key usages remaining.")
+
+    # No invalid product ID
+    def test_invalid_product(self):
+        with self.assertRaises(Exception) as context:
+            npcs_admin.connect()
+            order_id = npcs_admin.new_job()
+            npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
+            npcs_admin.run_job(order_id=order_id, product_name=test_utils.invalid_product_id)
+        self.assertEqual(str(context.exception),"Job run failed: Product not found.")
 
     # Successful status check
     def test_successful_status_check(self):
         npcs_admin.connect()
-        order_id = npcs_admin.check_status(order_id="TEST")
-        self.assertEqual(test_utils.is_valid_status_obj(order_id), True)
-
+        status = npcs_admin.check_status(order_id="TEST")
+        self.assertEqual(test_utils.is_valid_status_obj(status), True)
 
     # Invalid order id in status check
     def test_invalid_order_id_in_status_check(self):
@@ -88,7 +114,7 @@ class IntegrationTests(unittest.TestCase):
         npcs_admin.connect()
         with self.assertRaises(Exception) as context:
             results = npcs_admin.get_results(order_id="TEST", format="INVALID")
-        self.assertEqual(str(context.exception),"""Result retrieval failed: Invalid format! Valid formats include: "txt", "json", "xml", "png".""")
+        self.assertEqual(str(context.exception), "Result retrieval failed: Invalid format.")
         
 
 
