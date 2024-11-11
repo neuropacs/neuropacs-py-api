@@ -34,20 +34,18 @@ connection = npcs.connect()
 order_id = npcs.new_job()
 
 # UPLOAD A DATASET
-# --> dataset_path must be a valid path to a dataset <String>
-# --> dataset_id param is optional (only will be generated for you if you do not specify it). We recommend using the orderId as the datasetId for simplicity
-upload_status = npcs_admin.upload_dataset("/path/to/dataset/", order_id=order_id, dataset_id=order_id)
+upload_status = npcs_admin.upload_dataset_from_path(order_id=order_id,  path="/path/to/dataset/")
 
 # START A JOB
 # --> Valid product_name options: Atypical/MSAp/PSP-v1.0
-job_start_status = npcs.run_job(product_name=product_name, order_id=order_id)
+job_start_status = npcs.run_job(order_id=order_id, product_name=product_name)
 
 # CHECK JOB STATUS
 job_status = npcs.check_status(order_id=order_id)
 
 # RETRIEVE JOB RESULTS
 # --> Valid prediction_format options: TXT, PDF, XML, PNG
-job_results = npcs.get_results(prediction_format=prediction_format, order_id=order_id)
+job_results = npcs.get_results(order_id=order_id, prediction_format=prediction_format)
 ```
 
 ## Authors
