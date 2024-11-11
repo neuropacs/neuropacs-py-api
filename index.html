@@ -75,16 +75,16 @@
     order_id = npcs.<span class="code-function">new_job()</span>
 
     <span class="code-comment"># Upload a dataset</span>
-    upload = npcs.<span class="code-function">upload_dataset</span>(<span class="code-string">"/path/to/dataset/"</span>, order_id=order_id, dataset_id=order_id, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
+    upload = npcs.<span class="code-function">upload_dataset_from_path</span>(order_id=order_id, path=<span class="code-string">"/path/to/dataset/"</span>, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
 
     <span class="code-comment"># Start an order</span>
-    order_start = npcs.<span class="code-function">run_job</span>(product_name=product_name, order_id=order_id)
+    order_start = npcs.<span class="code-function">run_job</span>(order_id=order_id, product_name=product_name)
 
     <span class="code-comment"># Check order status</span>
     status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
 
     <span class="code-comment"># Retrieve job results</span>
-    results = npcs.<span class="code-function">get_results</span>(prediction_format=prediction_format, order_id=order_id)
+    results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=prediction_format)
         </code></pre>
         <h3>Example viewing a PNG result</h3>
         <pre class="code-container"><code class="language-python">
@@ -92,7 +92,7 @@
     <span class="code-keyword">from</span> PIL <span class="code-keyword">import</span> Image
 
     <span class="code-comment"># Retrieve job results in PNG</span>
-    results = npcs.<span class="code-function">get_results</span>(prediction_format=<span class="code-string">"PNG"</span>, order_id=order_id)
+    results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=<span class="code-string">"PNG"</span>)
 
     <span class="code-comment"># Create an image object from bytes</span>
     image = Image.<span class="code-function">open</span>(results)
