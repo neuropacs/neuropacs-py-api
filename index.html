@@ -24,6 +24,7 @@
         <li><a href="https://neuropacs.github.io/">Home</a></li>
         <li><a href="#installation">Installation</a></li>
         <li><a href="#usage">Usage</a></li>
+        <li><a href="#dicom-web">DICOMweb</a></li>
         <li><a href="#contact">Contact</a></li>
         <li><a href="#license">License</a></li>
         <li><a href="#explore">Explore</a></li>
@@ -51,56 +52,86 @@
 
       <section id="usage">
         <h2>Usage</h2>
-        <h3>Initialization</h3>
-        <pre class="code-container"><code class="language-shell">
-    <span class="code-comment"># Import the neuropacs module</span>
-    <span class="code-keyword">import</span> neuropacs
+        <div class="code-section">
+          <h3>Initialization</h3>
+          <p>Initialize the neuropacs™ API.</p>
+          <pre class="code-container"><code class="language-shell">
+  <span class="code-comment"># Import the neuropacs module</span>
+  <span class="code-keyword">import</span> neuropacs
 
-    <span class="code-comment"># Define neuropacs parameters</span>
-    api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
-    server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
-    product_name = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
-    prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results</span>
-    origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
+  <span class="code-comment"># Define neuropacs parameters</span>
+  api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
+  server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
+  product_name = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
+  prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results</span>
+  origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
 
-    <span class="code-comment"># Initialize the API</span>
-    npcs = neuropacs.<span class="code-function">init</span>(server_url=server_url, api_key=api_key, origin_type=origin_type)
+  <span class="code-comment"># Initialize the API</span>
+  npcs = neuropacs.<span class="code-function">init</span>(server_url=server_url, api_key=api_key, origin_type=origin_type)
+          </code></pre>
+        </div>
+
+        <div class="code-section">
+          <h3>Example</h3>
+          <p>Working example using the neuropacs™ API.</p>
+          <pre class="code-container"><code class="language-python">
+  <span class="code-comment"># Create a session</span>
+  conn = npcs.<span class="code-function">connect()</span>
+
+  <span class="code-comment"># Create a new order</span>
+  order_id = npcs.<span class="code-function">new_job()</span>
+
+  <span class="code-comment"># Upload a dataset from path</span>
+  upload = npcs.<span class="code-function">upload_dataset_from_path</span>(order_id=order_id, path=<span class="code-string">"/path/to/dataset/"</span>, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
+
+  <span class="code-comment"># Start an order</span>
+  order_start = npcs.<span class="code-function">run_job</span>(order_id=order_id, product_name=product_name)
+
+  <span class="code-comment"># Check order status</span>
+  status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
+
+  <span class="code-comment"># Retrieve job results</span>
+  results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=prediction_format)
         </code></pre>
-        <h3>Example</h3>
-        <pre class="code-container"><code class="language-python">
-    <span class="code-comment"># Create a session</span>
-    conn = npcs.<span class="code-function">connect()</span>
-
-    <span class="code-comment"># Create a new order</span>
-    order_id = npcs.<span class="code-function">new_job()</span>
-
-    <span class="code-comment"># Upload a dataset</span>
-    upload = npcs.<span class="code-function">upload_dataset_from_path</span>(order_id=order_id, path=<span class="code-string">"/path/to/dataset/"</span>, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
-
-    <span class="code-comment"># Start an order</span>
-    order_start = npcs.<span class="code-function">run_job</span>(order_id=order_id, product_name=product_name)
-
-    <span class="code-comment"># Check order status</span>
-    status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
-
-    <span class="code-comment"># Retrieve job results</span>
-    results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=prediction_format)
-        </code></pre>
+        </div>
+    
+        <div class="code-section">
         <h3>Example viewing a PNG result</h3>
+        <p>Download a PNG result file and view it.</p>
         <pre class="code-container"><code class="language-python">
-    <span class="code-comment"># Import pillow</span> 
-    <span class="code-keyword">from</span> PIL <span class="code-keyword">import</span> Image
+  <span class="code-comment"># Import pillow</span> 
+  <span class="code-keyword">from</span> PIL <span class="code-keyword">import</span> Image
 
-    <span class="code-comment"># Retrieve job results in PNG</span>
-    results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=<span class="code-string">"PNG"</span>)
+  <span class="code-comment"># Retrieve job results in PNG</span>
+  results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=<span class="code-string">"PNG"</span>)
 
-    <span class="code-comment"># Create an image object from bytes</span>
-    image = Image.<span class="code-function">open</span>(results)
+  <span class="code-comment"># Create an image object from bytes</span>
+  image = Image.<span class="code-function">open</span>(results)
 
-    <span class="code-comment"># Display the image</span>
-    image.<span class="code-function">show</span>()
-        </code></pre>
-      </section>
+  <span class="code-comment"># Display the image</span>
+  image.<span class="code-function">show</span>()
+            </code></pre>
+          </section>
+          </div>
+
+      <section id="dicom-web">          
+      <div class="code-section">
+        <h3>DICOMweb Integration</h3>
+        <p>The API retrieves and processes images directly from DICOMweb-compliant servers, enabling neuropacs™ analysis for streamlined diagnostic workflows.</p>
+        <pre class="code-container"><code class="language-python">
+  <span class="code-comment"># Define DICOMweb parameters</span>
+  dicom_web_base_url = <span class="code-string">"http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs"</span>
+  study_uid = <span class="code-string">"1.3.12.2.1107.5.2.32.35162.30000022041820573832300000043"</span>
+  username = <span class="code-string">"username"</span>
+  password = <span class="code-string">"password"</span>
+
+  <span class="code-comment"># Upload a dataset from DICOMweb</span>
+  upload = npcs.<span class="code-function">upload_dataset_from_dicom_web</span>(order_id=order_id, dicom_web_base_url=dicom_web_base_url, study_uid=study_uid, username=username, password=password, callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data))
+          </code></pre>
+        </div></section>
+
+            </section>
+            
 
       <section id="contact">
         <h2>Contact</h2>
@@ -133,6 +164,9 @@
         <ul class="integration-list">
           <li>
             <a href="https://neuropacs.github.io/SlicerNeuropacs/">3D Slicer</a>
+          </li>
+          <li>
+            <a href="#dicom-web">DICOMweb</a>
           </li>
           <!-- <li><a href="weasis.html">Weasis DICOM Viewer</a></li> -->
         </ul>
