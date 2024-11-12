@@ -85,7 +85,8 @@
   upload = npcs.<span class="code-function">upload_dataset_from_path</span>(
     order_id=order_id, 
     path=<span class="code-string">"/path/to/dataset/"</span>, 
-    callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data)) <span class="code-comment"># optional progress callback</span>
+    callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data) <span class="code-comment"># optional progress callback</span>
+  )
 
   <span class="code-comment"># Start an order</span>
   order_start = npcs.<span class="code-function">run_job</span>(order_id=order_id, product_name=product_name)
@@ -129,12 +130,14 @@
   password = <span class="code-string">"password"</span>
 
   <span class="code-comment"># Upload a dataset from DICOMweb</span>
-  upload = npcs.<span class="code-function">upload_dataset_from_dicom_web</span>(order_id=order_id, 
-  dicom_web_base_url=dicom_web_base_url, 
-  study_uid=study_uid, 
-  username=username,
-  password=password, 
-  callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data)) <span class="code-comment"># optional progress callback</span>
+  upload = npcs.<span class="code-function">upload_dataset_from_dicom_web</span>(
+    order_id=order_id, 
+    dicom_web_base_url=dicom_web_base_url, 
+    study_uid=study_uid, 
+    username=username,
+    password=password, 
+    callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data) <span class="code-comment"># optional progress callback</span>
+  )
           </code></pre>
         </div></section>
 
