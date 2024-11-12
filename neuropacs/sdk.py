@@ -461,9 +461,9 @@ class Neuropacs:
 
             if isinstance(path,str):
                 if not os.path.isdir(path):
-                    raise Exception("Path not a directory") 
+                    raise Exception("Path not a directory.") 
             else:
-                raise Exception("Path must be a string") 
+                raise Exception("Path must be a string.") 
 
             # Calculate number of files in the directory
             total_files = 0 
@@ -472,6 +472,9 @@ class Neuropacs:
                     file_path = os.path.join(dirpath, filename) # Get full file path
                     if os.path.isfile(file_path):
                         total_files += 1
+
+            if total_files == 0:
+                raise Exception("No files located in path.") 
 
             cur_zip_size = 0 # Counts size of current zip file
             part_index = 1 # Counts index of zip file
@@ -604,24 +607,28 @@ class Neuropacs:
         """
         try:
             if order_id is None or dicom_web_base_url is None or study_uid is None:
-                raise Exception("Parameter is missing")
+                raise Exception("Parameter is missing.")
 
             if(self.connection_id is None or self.aes_key is None):
                 raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
 
             # Create a DICOMwebClient instance
-            if(username is not None and password is not None):
-                # w/ auth
-                client = DICOMwebClient(
-                    url=dicom_web_base_url,
-                    username=username,
-                    password=password
-                )
-            else:
-                # w/out auth
-                client = DICOMwebClient(
-                    url=dicom_web_base_url
-                )
+            try:
+                if(username is not None and password is not None):
+                    # w/ auth
+                    client = DICOMwebClient(
+                        url=dicom_web_base_url,
+                        username=username,
+                        password=password
+                    )
+                else:
+                    # w/out auth
+                    client = DICOMwebClient(
+                        url=dicom_web_base_url
+                    )
+            except Exception:
+                raise ConnectionError("Unable to connect to the DICOMweb server.")
+
 
             # Update callback
             if callback is not None:
