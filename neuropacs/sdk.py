@@ -6,7 +6,6 @@ from Crypto.Util.Padding import pad
 import base64
 import zipfile
 import io
-from requests_toolbelt.multipart import decoder
 import uuid
 from datetime import datetime
 from dicomweb_client.api import DICOMwebClient
@@ -354,27 +353,6 @@ class Neuropacs:
             raise Exception(f"Upload part failed: {str(e)}")
 
 
-    def __split_zip_contents(self, zip_contents, part_size):
-        """
-        Split zip contents into chunk of part_size for upload
-
-        :param bytes zip_contents Bytes content of zip file
-        :param int part_size Size of each chunk
-        """
-        try:
-            parts = []
-            start = 0
-            while start < len(zip_contents):
-                end = min(start + part_size, len(zip_contents))
-                parts.append(zip_contents[start:end])
-                start = end
-            return parts
-        except Exception as error:
-            raise Exception(f"Partitioning blob failed: {str(error)}")
-
-
-        
-
     # Public Methods
 
     def get_public_key(self):
@@ -476,7 +454,6 @@ class Neuropacs:
             if total_files == 0:
                 raise Exception("No files located in path.") 
 
-            cur_zip_size = 0 # Counts size of current zip file
             part_index = 1 # Counts index of zip file
             files_uploaded = 0 # Track number of files uploaded
             filename_set = set() # Tracks exisitng file names
@@ -492,9 +469,6 @@ class Neuropacs:
                     # Get full file path
                     file_path = os.path.join(dirpath, filename)
 
-                    # Get file size
-                    file_size = os.path.getsize(file_path)
-
                     # Throw error if not a file
                     if not os.path.isfile(file_path):
                         raise Exception(f"Object {file_path} is not a file.")
@@ -506,8 +480,8 @@ class Neuropacs:
                     file_contents = self.__read_file_contents(file_path)
 
                     # If next chunk size will be larger than max, start next chunk
-                    next_zip_size = cur_zip_size + file_size
-                    if next_zip_size > self.max_zip_size:                        
+                    # next_zip_size = cur_zip_size + file_size
+                    if zip_buffer.tell() > self.max_zip_size:                        
                         # Close the zip file
                         zip_file.close()
                         zip_buffer.seek(0)
@@ -532,16 +506,11 @@ class Neuropacs:
                         zip_buffer.truncate(0)
                         zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
 
-                        cur_zip_size = 0
-
                         # Increment part number
                         part_index += 1
                     
                     # Write file to zip
                     zip_file.writestr(unqiue_filename, file_contents)
-
-                    # Increment zip file size
-                    cur_zip_size += file_size
 
                     # Increment files uploaded
                     files_uploaded += 1
@@ -561,8 +530,9 @@ class Neuropacs:
                         })
 
 
-            if(cur_zip_size > 0):
+            if(zip_buffer.tell() > 0):
                 # Upload remaining files in zip_buffer
+                
                 # Close the zip file
                 zip_file.close()
                 zip_buffer.seek(0)
@@ -652,9 +622,6 @@ class Neuropacs:
                     'status': f"Retrieving instances from DICOMweb for study {study_uid}"
                 })
 
-            # Track current zip file size
-            cur_zip_size = 0
-
             # BytesIO object to hold the ZIP file in memory
             zip_buffer = io.BytesIO()
 
@@ -678,17 +645,11 @@ class Neuropacs:
                 data_bytes = buffer.getvalue()
                 buffer.close()
 
-                # Get the file size
-                cur_file_size = len(data_bytes)
-
                 # Generate a unique filename for the current file
                 unique_filename = self.__generate_unique_uuid()
 
-                # Check if max size exceeded
-                next_zip_size = cur_zip_size + cur_file_size
-
                 # If max size exceeded OR on last file, upload
-                if next_zip_size > self.max_zip_size:
+                if zip_buffer.tell() > self.max_zip_size:
                     # Close the zip file
                     zip_file.close()
                     zip_buffer.seek(0)
@@ -713,18 +674,12 @@ class Neuropacs:
                     zip_buffer.truncate(0)
                     zip_file = zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED)
 
-                    # Reset zip size
-                    cur_zip_size = 0
-
                     # Increment part number
                     part_number += 1
 
             
                 # Add the current instance to the zip
                 zip_file.writestr(unique_filename, data_bytes)
-
-                # Increment zip size
-                cur_zip_size += cur_file_size
 
                 # Incremennt instances uploaded 
                 instances_uploaded += 1
@@ -743,7 +698,7 @@ class Neuropacs:
                         'status': f"Uploading instance {instances_uploaded}/{total_instances}"
                     })
 
-            if cur_zip_size > 0:
+            if zip_buffer.tell() > 0:
                 # Upload remaining files in zip_buffer
                 # Close the zip file
                 zip_file.close()
