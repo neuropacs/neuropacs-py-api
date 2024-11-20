@@ -68,8 +68,8 @@ class IntegrationTests(unittest.TestCase):
 
     # No API key usages remaining
     def test_no_api_key_usages_remaining(self):
+        npcs_no_usages.connect()
         with self.assertRaises(Exception) as context:
-            npcs_no_usages.connect()
             order_id = npcs_no_usages.new_job()
             npcs_no_usages.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
             npcs_no_usages.run_job(order_id=order_id, product_name=test_utils.product_id)
