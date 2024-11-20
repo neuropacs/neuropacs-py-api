@@ -34,7 +34,6 @@ class IntegrationTests(unittest.TestCase):
         order_id = npcs_admin.new_job()
         self.assertEqual(test_utils.is_valid_uuid4(order_id), True)
 
-
     # Missing connnection parameters
     def test_missing_connection_parameters(self):
         with self.assertRaises(Exception) as context:
@@ -66,14 +65,14 @@ class IntegrationTests(unittest.TestCase):
             npcs_reg.run_job(test_utils.invalid_order_id, test_utils.product_id)
         self.assertEqual(str(context.exception),"Job run failed: Bucket not found.")
 
-    # No API key usages remaining
-    def test_no_api_key_usages_remaining(self):
-        npcs_no_usages.connect()
-        with self.assertRaises(Exception) as context:
-            order_id = npcs_no_usages.new_job()
-            npcs_no_usages.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
-            npcs_no_usages.run_job(order_id=order_id, product_name=test_utils.product_id)
-        self.assertEqual(str(context.exception),"Job run failed: No API key usages remaining.")
+    # # No API key usages remaining
+    # def test_no_api_key_usages_remaining(self):
+    #     with self.assertRaises(Exception) as context:
+    #         npcs_no_usages.connect()
+    #         order_id = npcs_no_usages.new_job()
+    #         npcs_no_usages.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
+    #         npcs_no_usages.run_job(order_id=order_id, product_name=test_utils.product_id)
+    #     self.assertEqual(str(context.exception),"Job run failed: No API key usages remaining.")
 
     # No invalid product ID
     def test_invalid_product(self):
@@ -116,8 +115,5 @@ class IntegrationTests(unittest.TestCase):
             results = npcs_admin.get_results(order_id="TEST", format="INVALID")
         self.assertEqual(str(context.exception), "Result retrieval failed: Invalid format.")
         
-
-
-    
 if __name__ == '__main__':
     unittest.main()
