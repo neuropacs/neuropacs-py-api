@@ -1,0 +1,2 @@
+Changes:
+    - change "dicom_web_base_url" -> "wado_url"

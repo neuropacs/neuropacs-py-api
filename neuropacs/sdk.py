@@ -562,12 +562,12 @@ class Neuropacs:
            raise Exception(f"Error uploading dataset from path: {str(e)}")
 
 
-    def upload_dataset_from_dicom_web(self, order_id=None, dicom_web_base_url=None, study_uid=None, username=None, password=None, callback=None):
+    def upload_dataset_from_dicom_web(self, order_id=None, wado_url=None, study_uid=None, username=None, password=None, callback=None):
         """
         Retrieve a DICOM study from a DICOMweb server and upload.
 
         :param str order_id: Unique base64 identifier for the order.
-        :param str dicom_web_base_url: Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dicomweb')
+        :param str wado_url: Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dicomweb')
         :param str study_uid: Unique Study Instance UID of the study to be retrieved.
         :param str username: Username for basic authentication (if required).
         :param str password: Password for basic authentication (if required).
@@ -576,7 +576,7 @@ class Neuropacs:
         :return: Boolean indicating upload status.
         """
         try:
-            if order_id is None or dicom_web_base_url is None or study_uid is None:
+            if order_id is None or wado_url is None or study_uid is None:
                 raise Exception("Parameter is missing.")
 
             if(self.connection_id is None or self.aes_key is None):
@@ -587,14 +587,14 @@ class Neuropacs:
                 if(username is not None and password is not None):
                     # w/ auth
                     client = DICOMwebClient(
-                        url=dicom_web_base_url,
+                        url=wado_url,
                         username=username,
                         password=password
                     )
                 else:
                     # w/out auth
                     client = DICOMwebClient(
-                        url=dicom_web_base_url
+                        url=wado_url
                     )
             except Exception:
                 raise ConnectionError("Unable to connect to the DICOMweb server.")
