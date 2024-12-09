@@ -120,11 +120,11 @@
 
       <section id="dicom-web">          
       <div class="code-section">
-        <h3>DICOMweb Integration</h3>
-        <p>The API retrieves and processes images directly from DICOMweb-compliant servers, enabling neuropacs™ analysis for streamlined diagnostic workflows.</p>
+        <h3>DICOMweb WADO-RS Integration</h3>
+        <p>The API retrieves and processes images directly from DICOMweb WADO-RS servers, enabling neuropacs™ analysis for streamlined diagnostic workflows.</p>
         <pre class="code-container"><code class="language-python">
   <span class="code-comment"># Define DICOMweb parameters</span>
-  dicom_web_base_url = <span class="code-string">"http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs"</span>
+  wado_url = <span class="code-string">"http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs"</span>
   study_uid = <span class="code-string">"1.3.12.2.1107.5.2.32.35162.30000022041820573832300000043"</span>
   username = <span class="code-string">"username"</span>
   password = <span class="code-string">"password"</span>
@@ -132,7 +132,7 @@
   <span class="code-comment"># Upload a dataset from DICOMweb</span>
   upload = npcs.<span class="code-function">upload_dataset_from_dicom_web</span>(
     order_id=order_id, 
-    dicom_web_base_url=dicom_web_base_url, 
+    wado_url=wado_url, 
     study_uid=study_uid, 
     username=username,
     password=password, 
