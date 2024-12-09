@@ -1,3 +1,7 @@
+# neuropacs Python API v1.8.5
+# (c) 2024 neuropacs
+# Released under the MIT License.
+
 import os
 import requests
 import json
@@ -7,9 +11,11 @@ import base64
 import zipfile
 import io
 import uuid
+import time
 from datetime import datetime
 from dicomweb_client.api import DICOMwebClient
 from Crypto.Cipher import AES
+from functools import wraps
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -206,7 +212,9 @@ class Neuropacs:
         return new_name
 
     def __generate_unique_uuid(self):
-        """Generate a random v4 uuid
+        """
+        Generate a random v4 uuid
+
         :return: V4 UUID string
         """
         return str(uuid.uuid4())
@@ -223,13 +231,37 @@ class Neuropacs:
             contents = file.read()
         return contents
 
+    def __retry_request(max_retries=3, delay=1):
+        """
+        A decorator to retry AWS request-based function multiple times if it fails.
+        
+        :param max_retries: Maximum number of retries before giving up.
+        :param delay: Delay in seconds between retries.
+        """
+        def decorator(func):
+            @wraps(func) # better for API implementation
+            def wrapper(*args, **kwargs):
+                attempt = 0
+                while attempt < max_retries:
+                    try:
+                        return func(*args, **kwargs)
+                    except Exception as e:
+                        attempt += 1
+                        if attempt == max_retries:
+                            # All attempts failed
+                            raise
+                        time.sleep(delay)
+            return wrapper
+        return decorator
+
+    @__retry_request(max_retries=3, delay=1)
     def __new_multipart_upload(self, dataset_id, zip_index, order_id):
         """
         Start a new multipart upload
 
         :param str dataset_id Base64 dataset_id
         :param int zip_index Index of zip file
-        :param str order_id Base65 order_id
+        :param str order_id Base64 order_id
 
         :returns AWS upload_id
         """
@@ -258,8 +290,8 @@ class Neuropacs:
 
         except Exception as e:
             raise Exception(f"Multipart upload initialization failed: {str(e)}")
-            
 
+    @__retry_request(max_retries=3, delay=1)
     def __complete_multipart_upload(self, order_id, dataset_id, zip_index, upload_id, upload_parts):
         """
         Complete a new multipart upload
@@ -296,6 +328,7 @@ class Neuropacs:
         except Exception as e:
             raise Exception(f"Multipart upload completion failed: {str(e)}")
 
+    @__retry_request(max_retries=3, delay=1)
     def __upload_part(self, upload_id, dataset_id, zip_index, order_id, part_number, part_data):
         """
         Upload a part of the multipart upload
@@ -322,6 +355,7 @@ class Neuropacs:
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
 
+            # Retrieve a presigned url
             res = requests.post(f"{self.server_url}/api/multipartPresignedUrl/", data=encrypted_body, headers=headers)
             
             if not res.ok:
@@ -332,26 +366,24 @@ class Neuropacs:
             res_json = self.__decrypt_aes_ctr(text, "json")
             presigned_url = res_json["presignedUrl"] # URL to upload part
 
-            fail = False
-            for attempt in range(3):
-                upload_res = requests.put(presigned_url, data=part_data)
+            if(presigned_url is None):
+                raise Exception("Presigned URL not present in AWS response.")
 
-                if not upload_res.ok:
-                    print(upload_res.text)
-                    print(upload_res.status_code)
-                    fail = True
-                else:
-                    e_tag = upload_res.headers.get('ETag')
-                    if e_tag == None:
-                        continue
-                    return e_tag
+            # Put data to presigned url
+            res = requests.put(presigned_url, data=part_data)
 
-            if fail:
-                raise Exception("Upload failed after 3 attempts")
+            if not res.ok:
+                raise Exception(res.text)  
+                
+            e_tag = res.headers.get('ETag')
+
+            if(e_tag is None):
+                raise Exception("Etag header not present in AWS response.")
+
+            return e_tag
 
         except Exception as e:
             raise Exception(f"Upload part failed: {str(e)}")
-
 
     # Public Methods
 
@@ -562,12 +594,12 @@ class Neuropacs:
            raise Exception(f"Error uploading dataset from path: {str(e)}")
 
 
-    def upload_dataset_from_dicom_web(self, order_id=None, dicom_web_base_url=None, study_uid=None, username=None, password=None, callback=None):
+    def upload_dataset_from_dicom_web(self, order_id=None, wado_url=None, study_uid=None, username=None, password=None, callback=None):
         """
-        Retrieve a DICOM study from a DICOMweb server and upload.
+        Upload a dataset via DICOMweb WADO-RS protocol.
 
         :param str order_id: Unique base64 identifier for the order.
-        :param str dicom_web_base_url: Base URL of the DICOMweb server (e.g., 'http://localhost:8080/dicomweb')
+        :param str wado_url: URL to access DICOM images via the WADO-RS protocol (e.g. 'http://localhost:8080/dcm4chee-arc/aets/DCM4CHEE/rs').
         :param str study_uid: Unique Study Instance UID of the study to be retrieved.
         :param str username: Username for basic authentication (if required).
         :param str password: Password for basic authentication (if required).
@@ -576,7 +608,7 @@ class Neuropacs:
         :return: Boolean indicating upload status.
         """
         try:
-            if order_id is None or dicom_web_base_url is None or study_uid is None:
+            if order_id is None or wado_url is None or study_uid is None:
                 raise Exception("Parameter is missing.")
 
             if(self.connection_id is None or self.aes_key is None):
@@ -587,14 +619,14 @@ class Neuropacs:
                 if(username is not None and password is not None):
                     # w/ auth
                     client = DICOMwebClient(
-                        url=dicom_web_base_url,
+                        url=wado_url,
                         username=username,
                         password=password
                     )
                 else:
                     # w/out auth
                     client = DICOMwebClient(
-                        url=dicom_web_base_url
+                        url=wado_url
                     )
             except Exception:
                 raise ConnectionError("Unable to connect to the DICOMweb server.")
