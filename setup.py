@@ -7,7 +7,7 @@ setup(
     license='MIT',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    author='Kerrick Cavanaugh',
+    author='Kerriczzk Cavanaugh',
     author_email='kerrick@neuropacs.com',
     url='https://github.com/neuropacs/neuropacs-py-sdk',
     packages=find_packages(),
@@ -17,7 +17,6 @@ setup(
         'requests>=2.31.0',
         'requests-toolbelt>=1.0.0',
         'dicomweb-client>=0.59.3',
-        'urllib3<=1.26.6'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
