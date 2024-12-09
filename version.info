@@ -1,2 +1,9 @@
-Changes:
-    - change "dicom_web_base_url" -> "wado_url"
+v1.8.5:
+    - Change "dicom_web_base_url" -> "wado_url"
+    - Update param description for wado_url
+    - Add __retry_request decorator for retry of AWS requests
+        - added 'time' and 'functools' dependencies
+        - added decorator to '__new_multipart_upload', '__complete_multipart_upload', and '__upload_part'
+        - Remove retry logic from 'upload_part'
+    - Doc fixes
+    - Add existence checks for Etag and presignedUrl
