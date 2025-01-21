@@ -8,10 +8,13 @@ import os
 # CONSTANTS
 server_url = "https://zq5jg2kqvj.execute-api.us-east-1.amazonaws.com/staging"
 invalidServerUrl = "https://invalid.execute-api.us-east-2.amazonaws.com/not_real"
-admin_key = os.getenv('ADMIN_API_KEY')
+# admin_key = os.getenv('ADMIN_API_KEY')
+admin_key = "Ln0Zf11LRP9vVB8UgxJNl4RSmoBERexb83CiOvCq"
 invalid_key = "invalidApiKey123"
-reg_key = os.getenv('REG_API_KEY')
-no_usages_remaining_api_key = os.getenv('NO_USAGES_REMAINING_API_KEY')
+# reg_key = os.getenv('REG_API_KEY')
+reg_key = "r7TK56hInGaj3aNug4Mmc5mqCZ3fVQjT1HilX6Tp"
+# no_usages_remaining_api_key = os.getenv('NO_USAGES_REMAINING_API_KEY')
+no_usages_remaining_api_key = "DsX5YzUkTq84ddbeprc29Bm20u0ZEdO9jNQxL3Mg"
 origin_type = "Python Integration Tests"
 
 
@@ -79,6 +82,16 @@ def is_valid_result_txt(result):
   return isinstance(result, str) and len(result) > 0
 
 def is_valid_result_json(result):
+    try:
+        json.loads(result)
+        return True
+    except Exception as e:
+        return False
+
+def is_valid_report_txt(result):
+  return isinstance(result, str) and len(result) > 0
+
+def is_valid_report_json(result):
     try:
         json.loads(result)
         return True
