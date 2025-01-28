@@ -12,12 +12,18 @@ def main():
     conn = npcs.connect()
     print(conn)
 
-    report = npcs.get_report("email", "10/1/2024", "1/15/2025")
-    print(report)
 
-    # # # CREATE A NEW JOB
-    # order = npcs.new_job()
-    # print(order)
+    # CREATE A NEW JOB
+    order = npcs.new_job()
+    print(order)
+
+    upload = npcs.upload_dataset_from_path(order, "/Users/kerrickcavanaugh/Desktop/sample data/06_001", callback=lambda data: print(data))
+    print(upload)
+
+    # report = npcs.get_report("email", "10/1/2024", "1/15/2025")
+    # print(report)
+
+  
 
     # print(npcs.check_status("TEST"))
 
