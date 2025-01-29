@@ -927,6 +927,12 @@ class Neuropacs:
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
+            format = format.lower()
+
+            validFormats = ["txt", "csv", "json"]
+
+            if format not in validFormats:
+                raise Exception("Invalid format.")
         
             body = {
                 'orderId': order_id,
