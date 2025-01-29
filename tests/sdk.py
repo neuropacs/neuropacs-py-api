@@ -292,7 +292,7 @@ class Neuropacs:
             raise Exception(f"Multipart upload initialization failed: {str(e)}")
 
     @__retry_request(max_retries=3, delay=1)
-    def __complete_multipart_upload(self, order_id, dataset_id, zip_index, upload_id, upload_parts):
+    def __complete_multipart_upload(self, order_id, dataset_id, zip_index, upload_id, upload_parts, final_part):
         """
         Complete a new multipart upload
 
@@ -301,6 +301,7 @@ class Neuropacs:
         :param int zip_index Index of zip file
         :param str upload_id Base64 upload_id
         :param dict upload_parts Uploaded parts dict
+        :param int final_part Final part of upload (0==no, 1==yes)
 
         :returns Status code
         """
@@ -313,7 +314,8 @@ class Neuropacs:
                 'zipIndex': zip_index,
                 'uploadId': upload_id,
                 'uploadParts': upload_parts,
-                'orderId': order_id
+                'orderId': order_id,
+                'finalPart': final_part
             }
 
             encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
@@ -531,7 +533,10 @@ class Neuropacs:
                         e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_index, zip_file_contents)
 
                         # Complete mulitpart upload
-                        self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}])
+                        if files_uploaded-1 == total_files:
+                            self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}], 1)
+                        else:
+                            self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}], 0)
 
                         # Clear buffer and reset zip file
                         zip_buffer.seek(0)
@@ -582,7 +587,7 @@ class Neuropacs:
                 e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_index, zip_file_contents)
 
                 # Complete multipart upload
-                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}])
+                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_index, 'ETag': e_tag}], 1)
 
             # Close the zip file if it's still open
             if zip_file.fp is not None:
@@ -699,7 +704,10 @@ class Neuropacs:
                     e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_number, zip_file_contents)
 
                     # Complete multipart upload
-                    self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}])
+                    if instances_uploaded-1 == total_instances:
+                        self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}], 1)
+                    else:
+                        self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}], 0)
 
                     # Clear buffer and reset cur_zip_size
                     zip_buffer.seek(0)
@@ -749,7 +757,7 @@ class Neuropacs:
                 e_tag = self.__upload_part(upload_id, order_id, str(zip_index), order_id, part_number, zip_file_contents)
 
                 # Complete multipart upload
-                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}])
+                self.__complete_multipart_upload(order_id, order_id, str(zip_index), upload_id, [{'PartNumber': part_number, 'ETag': e_tag}], 1)
 
             # Close the zip file if it's still open
             if zip_file.fp is not None:
@@ -903,56 +911,44 @@ class Neuropacs:
         except Exception as e:
             raise Exception(f"Result retrieval failed: {str(e)}")
 
-    def get_report(self, format=None, start_date=None, end_date=None):
-        """
-        Date must be in GMT - this is what server logs in 
+    def qc_check(self, order_id=None, format=None):
+        """QC
+
+        :param str order_id: Unique base64 identifier for the order.
+
+        :return: QC report in JSON.
         """
         try:
-            if format is None or start_date is None or end_date is None:
-                raise Exception("Parameter is missing.")
+            if order_id is None or format is None:
+                raise Exception("Parameter is missing")
 
             if(self.connection_id is None or self.aes_key is None):
                 raise Exception("Missing session parameters, start a new session with 'connect()' and try again.")
-
-            # Check if date are valid dates
-            try:
-                start_input_date = datetime.strptime(start_date, "%m/%d/%Y")
-                end_input_date = datetime.strptime(end_date, "%m/%d/%Y")                
-            except Exception as e:
-                raise Exception("Invalid date format (MM/DD/YYYY).")
-
-            # Check if either date is in the future
-            today = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
-            if end_input_date > today or start_input_date > today:
-                raise Exception("Provided date must not exceed current date.")
-            elif start_input_date > end_input_date:
-                raise Exception("start_date must not exceed end_date.")
 
             headers = {'Content-Type': 'text/plain', 'Connection-Id': self.connection_id, 'Origin-Type': self.origin_type}
 
             format = format.lower()
 
-            validFormats = ["txt", "email", "json",]
+            validFormats = ["txt", "csv", "json"]
 
             if format not in validFormats:
                 raise Exception("Invalid format.")
-
+        
             body = {
-                'startDate': start_date,
-                'endDate': end_date,
-                'format': format               
+                'orderId': order_id,
+                'format': format
             }
 
-            encrypted_body = self.__encrypt_aes_ctr(body, "json", "string")
+            encryptedBody = self.__encrypt_aes_ctr(body, "json", "string")
 
-            res = requests.post(f"{self.server_url}/api/getReport/", data=encrypted_body, headers=headers)
+            res = requests.post(f"{self.server_url}/api/qcCheck/", data=encryptedBody, headers=headers)
             
             if not res.ok:
                 raise Exception(json.loads(res.text)["error"])
-
+            
             text = res.text
-
-            return self.__decrypt_aes_ctr(text, "string")
-
+            jsn = self.__decrypt_aes_ctr(text, "string")
+            return jsn
+            
         except Exception as e:
-            raise Exception(f"Report retrieval failed: {str(e)}")
+            raise Exception(f"QC check failed: {str(e)}")
