@@ -1,5 +1,6 @@
 import unittest
 import test_utils
+import time
 import neuropacs
 # import sdk
 
@@ -11,11 +12,11 @@ npcs_invalid_url = neuropacs.init(server_url=test_utils.invalidServerUrl, api_ke
 
 class IntegrationTests(unittest.TestCase):
 
-    # Invalid URL
-    # def test_invalid_url(self):
-    #     with self.assertRaises(AssertionError) as context:
-    #         npcs_invalid_url.connect()
-    #     self.assertAlmostEqual(str(context.exception),"Connection creation failed: Public key retrieval failed: HTTPSConnectionPool(host='invalid.execute-api.us-east-2.amazonaws.com', port=443): Max retries exceeded with url: /not_real/api/getPubKey (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x1061c3a60>: Failed to establish a new connection: [Errno 8] nodename nor servname provided, or not known'))")
+    # # Invalid URL
+    # # def test_invalid_url(self):
+    # #     with self.assertRaises(AssertionError) as context:
+    # #         npcs_invalid_url.connect()
+    # #     self.assertAlmostEqual(str(context.exception),"Connection creation failed: Public key retrieval failed: HTTPSConnectionPool(host='invalid.execute-api.us-east-2.amazonaws.com', port=443): Max retries exceeded with url: /not_real/api/getPubKey (Caused by NewConnectionError('<urllib3.connection.HTTPSConnection object at 0x1061c3a60>: Failed to establish a new connection: [Errno 8] nodename nor servname provided, or not known'))")
 
     # Successful connection
     def test_successful_connection(self):
@@ -114,6 +115,64 @@ class IntegrationTests(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             results = npcs_admin.get_results(order_id="TEST", format="INVALID")
         self.assertEqual(str(context.exception), "Result retrieval failed: Invalid format.")
+
+    # Successfully run QC check (DCM2NIIX error)
+    def test_successful_qc_check(self):
+        import sdk
+        npcs_test = sdk.Neuropacs(server_url="https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox", api_key="generate_api_key", origin_type=test_utils.origin_type)
+        npcs_test.connect()
+        order_id = npcs_test.new_job()
+        npcs_test.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
+        time.sleep(50)
+        qc = npcs_test.qc_check(order_id, "txt")
+        print(qc)
+        self.assertEqual(qc, "QC FAILED: ERR_DCM2NIIX_FAILED")
+
+    # Qc check invalid format
+    def test_valid_format_qc_check(self):
+        import sdk
+        npcs_test = sdk.Neuropacs(server_url="https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox", api_key="generate_api_key", origin_type=test_utils.origin_type)
+        npcs_test.connect()
+        order_id = npcs_test.new_job()
+        with self.assertRaises(Exception) as context:
+            npcs_test.qc_check(order_id, "not_real")
+        self.assertEqual(str(context.exception), "QC check failed: Invalid format.")
+
+    # Qc check missing params
+    def test_no_dataset_qc_check(self):
+        import sdk
+        npcs_test = sdk.Neuropacs(server_url="https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox", api_key="generate_api_key", origin_type=test_utils.origin_type)
+        npcs_test.connect()
+        order_id = npcs_test.new_job()
+        npcs_test.api_key = None
+        with self.assertRaises(Exception) as context:
+            npcs_test.qc_check(order_id, "txt")
+        self.assertEqual(str(context.exception), "QC check failed: No dataset found. Upload a dataset before running QC.")
+    
+
+    # Qc Check dataset in use
+    def test_dataset_in_use_qc_check(self):
+        import sdk
+        npcs_test = sdk.Neuropacs(server_url="https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox", api_key="generate_api_key", origin_type=test_utils.origin_type)
+        npcs_test.connect()
+        order_id = npcs_test.new_job()
+        npcs_test.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
+        with self.assertRaises(Exception) as context:
+            npcs_test.qc_check(order_id, "txt")
+        self.assertEqual(str(context.exception), "QC check failed: Dataset in use, try again later.")
+    
+    # Qc check qc in progress
+    def test_qc_in_progress_qc_check(self):
+        import sdk
+        npcs_test = sdk.Neuropacs(server_url="https://ud7cvn39n4.execute-api.us-east-1.amazonaws.com/sandbox", api_key="generate_api_key", origin_type=test_utils.origin_type)
+        npcs_test.connect()
+        order_id = npcs_test.new_job()
+        npcs_test.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local, callback=lambda data: print(data))
+        time.sleep(30)
+        with self.assertRaises(Exception) as context:
+            npcs_test.qc_check(order_id, "txt")
+        self.assertEqual(str(context.exception), "QC check failed: QC in progress.")
+
         
 if __name__ == '__main__':
     unittest.main()
