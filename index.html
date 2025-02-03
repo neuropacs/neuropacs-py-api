@@ -63,7 +63,8 @@
   api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
   server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
   product_name = <span class="code-string">"Atypical/MSAp/PSP-v1.0"</span> <span class="code-comment"># Desired neuropacs™ product</span>
-  prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results</span>
+  prediction_format = <span class="code-string">"JSON"</span> <span class="code-comment"># Output format of results ("TXT"/"JSON"/"XML"/"FEATURES")</span>
+  qc_format = <span class="code-string">"CSV"</span> <span class="code-comment"># Format of QC results ("CSV"/"TXT"/"JSON")</span>
   origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
 
   <span class="code-comment"># Initialize the API</span>
@@ -88,6 +89,9 @@
     callback=<span class="code-keyword">lambda</span> data: <span class="code-function">print</span>(data) <span class="code-comment"># optional progress callback</span>
   )
 
+  <span class="code-comment"># Run QC/Compliance check on uploaded dataset (not required)</span>
+  qc_results = npcs.<span class="code-function">qc_check</span>(order_id=order_id, format=qc_format)
+
   <span class="code-comment"># Start an order</span>
   order_start = npcs.<span class="code-function">run_job</span>(order_id=order_id, product_name=product_name)
 
@@ -95,7 +99,7 @@
   status = npcs.<span class="code-function">check_status</span>(order_id=order_id)
 
   <span class="code-comment"># Retrieve job results</span>
-  results = npcs.<span class="code-function">get_results</span>(order_id=order_id, prediction_format=prediction_format)
+  results = npcs.<span class="code-function">get_results</span>(order_id=order_id, format=prediction_format)
         </code></pre>
         </div>
     
@@ -117,6 +121,27 @@
             </code></pre>
           </section>
           </div>
+
+      <section id="usage-report">          
+        <div class="code-section">
+          <h3>API Key Usage Report</h3>
+          <p>Generate a structured API key usage report for any neuropacs™ API key. If an admin API key is used. An aggregated report will be created with all keys associated with the same institution. If "email" format is used, an email will be sent to the admin associated with the specified API key.</p>
+          <pre class="code-container"><code class="language-python">
+  <span class="code-comment"># Define neuropacs parameters</span>
+  api_key = <span class="code-string">"your_api_key"</span> <span class="code-comment"># API key</span>
+  server_url = <span class="code-string">"server_url"</span> <span class="code-comment"># neuropacs™ serverl URL</span>
+  format = <span class="code-string">"CSV"</span> <span class="code-comment"># Format of report ("TXT"/"JSON"/"EMAIL")</span>
+  start_date = <span class="code-string">"10/1/2025"</span> <span class="code-comment"># Start date of report (mM/dD/YYYY)</span>
+  end_date = <span class="code-string">"12/15/2025"</span> <span class="code-comment"># End date of report (mM/dD/YYYY)</span>
+  origin_type = <span class="code-string">"my_application"</span> <span class="code-comment"># Requestor origin</span>
+
+  <span class="code-comment"># Create a session</span>
+  conn = npcs.<span class="code-function">connect()</span>
+
+  <span class="code-comment"># Generate the report</span>    
+  report = npcs.<span class="code-function">get_report</span>(start_date=start_date, end_date=end_date, format=format)
+    </code></pre>
+      </div></section>
 
       <section id="dicom-web">          
       <div class="code-section">
@@ -214,7 +239,7 @@
     </main>
 
     <footer class="footer">
-      <p>&copy; 2024 neuropacs™. All rights reserved.</p>
+      <p>&copy; 2025 neuropacs™. All rights reserved.</p>
     </footer>
   </body>
 </html>
