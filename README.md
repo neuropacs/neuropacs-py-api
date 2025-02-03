@@ -70,6 +70,7 @@ npcs = neuropacs.init(server_url=server_url, api_key=api_key, origin_type=origin
 connection = npcs.connect()
 
 # GET REPORT
+# --> If 'email' format used, an email will be sent to the admin user associated with the specified key
 usage_report = get_report(format=format, start_date=start_datae, end_date=end_date)
 ```
 
