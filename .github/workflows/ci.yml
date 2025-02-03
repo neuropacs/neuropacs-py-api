@@ -15,6 +15,7 @@ jobs:
     env:
       ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
       REG_API_KEY: ${{ secrets.REG_API_KEY }}
+      NO_USAGES_REMAINING_API_KEY: ${{ secrets.NO_USAGES_REMAINING_API_KEY }}
 
     steps:
       - name: Checkout repository
