@@ -48,7 +48,7 @@ job_start_status = npcs.run_job(order_id=order_id, product_name=product_name)
 job_status = npcs.check_status(order_id=order_id)
 
 # RETRIEVE JOB RESULTS
-# --> Valid prediction_format options: TXT, PDF, XML, PNG
+# --> Valid prediction_format options: TXT, PDF, XML, PNG, "FEATURES"
 job_results = npcs.get_results(order_id=order_id, format=prediction_format)
 ```
 
