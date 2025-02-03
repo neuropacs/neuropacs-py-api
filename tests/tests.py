@@ -96,9 +96,9 @@ class IntegrationTests(unittest.TestCase):
 
     # No API key usages remaining
     def test_no_api_key_usages_remaining(self):
+        self.npcs_no_usages.connect()
+        order_id = self.npcs_no_usages.new_job()
         with self.assertRaises(Exception) as context:
-            self.npcs_no_usages.connect()
-            order_id = self.npcs_no_usages.new_job()
             self.npcs_no_usages.run_job(order_id=order_id, product_name=test_utils.product_id)
         self.assertEqual(str(context.exception),"Job run failed: No API key usages remaining.")
 
