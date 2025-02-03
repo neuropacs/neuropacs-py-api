@@ -869,7 +869,7 @@ class Neuropacs:
         """Get job results for a specified order in a specified format
 
         :prarm str order_id: Unique base64 identifier for the order.
-        :param str format: Format of file data ('txt'/'xml'/'json'/'png')
+        :param str format: Format of file data ('txt'/'xml'/'json'/'png'/'features')
         
         :return: Result data in specified format
         """
@@ -884,7 +884,7 @@ class Neuropacs:
 
             format = format.lower()
 
-            validFormats = ["txt", "xml", "json", "png"]
+            validFormats = ["txt", "xml", "json", "png", "features"]
 
             if format not in validFormats:
                 raise Exception("Invalid format.")
@@ -903,7 +903,7 @@ class Neuropacs:
 
             text = res.text
 
-            if format == "txt" or format == "xml" or format == "json":
+            if format == "txt" or format == "xml" or format == "json" or format == "features":
                 return self.__decrypt_aes_ctr(text, "string")
             elif format == "png":
                 return self.__decrypt_aes_ctr(text, "bytes")
@@ -912,7 +912,7 @@ class Neuropacs:
             raise Exception(f"Result retrieval failed: {str(e)}")
 
     def qc_check(self, order_id=None, format=None):
-        """QC
+        """QC/Compliance validation for an uploaded dataset
 
         :param str order_id: Unique base64 identifier for the order.
 
@@ -955,7 +955,7 @@ class Neuropacs:
 
     def get_report(self, format=None, start_date=None, end_date=None):
         """
-        Date must be in GMT - this is what server logs in 
+        Generate an order report based on provided API key
         """
         try:
             if format is None or start_date is None or end_date is None:

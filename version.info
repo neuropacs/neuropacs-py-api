@@ -1,9 +1,6 @@
-v1.8.5:
-    - Change "dicom_web_base_url" -> "wado_url"
-    - Update param description for wado_url
-    - Add __retry_request decorator for retry of AWS requests
-        - added 'time' and 'functools' dependencies
-        - added decorator to '__new_multipart_upload', '__complete_multipart_upload', and '__upload_part'
-        - Remove retry logic from 'upload_part'
-    - Doc fixes
-    - Add existence checks for Etag and presignedUrl
+v1.8.6:
+    - Add get_report API to retrieve a structure API key usage report for a specified date range
+    - Add qc_check API to retrieve QC/Compliance check results
+    - Add "features" option to get_results API to retrieve contents of AIDP.csv features
+    - Add "final_part" param to complete_multipart_upload to indicate last chunk of upload
+        - needed for QC backend to detect a completed upload
