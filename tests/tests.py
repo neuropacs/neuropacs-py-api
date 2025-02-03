@@ -59,7 +59,7 @@ class IntegrationTests(unittest.TestCase):
     def test_successful_dataset_upload(self):
         self.npcs_admin.connect()
         order_id = self.npcs_admin.new_job()
-        upload_status = self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
+        upload_status = self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git)
         self.assertEqual(upload_status, True)
 
     # Invalid dataset path
@@ -74,14 +74,14 @@ class IntegrationTests(unittest.TestCase):
     def test_invalid_order_id_upload(self):
         self.npcs_admin.connect()
         with self.assertRaises(Exception) as context:
-            self.npcs_admin.upload_dataset_from_path(order_id="no_real", path=test_utils.dataset_path_local)
+            self.npcs_admin.upload_dataset_from_path(order_id="no_real", path=test_utils.dataset_path_git)
         self.assertEqual(str(context.exception),"Error uploading dataset from path: Multipart upload initialization failed: Bucket not found.")
 
     # Successful job run
     def test_successful_job_run(self):
         self.npcs_admin.connect()
         order_id = self.npcs_admin.new_job()
-        upload_status = self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local_single)
+        upload_status = self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
         time.sleep(30)
         job = self.npcs_admin.run_job(order_id=order_id, product_name=test_utils.product_id)
         self.assertEqual(upload_status, True)
@@ -107,7 +107,7 @@ class IntegrationTests(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.npcs_admin.connect()
             order_id = self.npcs_admin.new_job()
-            self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local_single)
+            self.npcs_admin.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git_single)
             self.npcs_admin.run_job(order_id=order_id, product_name=test_utils.invalid_product_id)
         self.assertEqual(str(context.exception),"Job run failed: Product not found.")
 
@@ -153,7 +153,7 @@ class IntegrationTests(unittest.TestCase):
     def test_successful_qc_check(self):
         self.npcs_reg.connect()
         order_id = self.npcs_reg.new_job()
-        self.npcs_reg.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
+        self.npcs_reg.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git)
         time.sleep(120)
         qc = self.npcs_reg.qc_check(order_id, "txt")
         self.assertIn("QC FAILED", qc)
@@ -179,7 +179,7 @@ class IntegrationTests(unittest.TestCase):
     def test_dataset_in_use_qc_check(self):
         self.npcs_reg.connect()
         order_id = self.npcs_reg.new_job()
-        self.npcs_reg.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
+        self.npcs_reg.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_git)
         with self.assertRaises(Exception) as context:
             self.npcs_reg.qc_check(order_id, "txt")
         self.assertIn(str(context.exception), [
