@@ -27,7 +27,9 @@ setup(
 )
 
 # To update this package:
-# 1. Remove /build /dist /neuropacs.egg-info
-# 2. Update version in setup.py and __init__.py
-# 3. Run: python setup.py sdist bdist_wheel
-# 4. Run: twine upload dist/*
+# 1. ENSURE ALL KEYS ARE REMOVED
+# 2. Remove /build /dist /neuropacs.egg-info
+    # rm -rf ./build ./dist ./neuropacs.egg-info
+# 3. Update version in setup.py and __init__.py
+# 4. Run: python setup.py sdist bdist_wheel
+# 5. Run: twine upload dist/*

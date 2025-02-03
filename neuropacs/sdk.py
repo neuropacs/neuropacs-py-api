@@ -1,5 +1,5 @@
-# neuropacs Python API v1.8.5
-# (c) 2024 neuropacs
+# neuropacs Python API v1.8.6
+# (c) 2025 neuropacs
 # Released under the MIT License.
 
 import os
@@ -915,8 +915,9 @@ class Neuropacs:
         """QC/Compliance validation for an uploaded dataset
 
         :param str order_id: Unique base64 identifier for the order.
+        :param str format: Format to recieve QC report ("txt"/"csv"/"json").
 
-        :return: QC report in JSON.
+        :return: QC report in specified format.
         """
         try:
             if order_id is None or format is None:
@@ -955,7 +956,13 @@ class Neuropacs:
 
     def get_report(self, format=None, start_date=None, end_date=None):
         """
-        Generate an order report based on provided API key
+        Generate a structured API key usage report.
+
+        :param str order_id: Format to recieve usage report ("txt"/"email"/"json").
+        :param str start_date: Start date of report in the form MM/DD/YYYY.
+        :param str end_date: End date of report in the form MM/DD/YYYY.
+
+        :return: Structured report in specified format, or email confirmation string.
         """
         try:
             if format is None or start_date is None or end_date is None:
