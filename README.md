@@ -71,7 +71,7 @@ connection = npcs.connect()
 
 # GET REPORT
 # --> If 'email' format used, an email will be sent to the admin user associated with the specified key
-usage_report = get_report(format=format, start_date=start_datae, end_date=end_date)
+usage_report = get_report(format=format, start_date=start_date, end_date=end_date)
 ```
 
 ### DICOMweb WADO-RS Integration
