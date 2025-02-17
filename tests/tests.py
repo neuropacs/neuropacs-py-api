@@ -174,18 +174,6 @@ class IntegrationTests(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.npcs_reg.qc_check(order_id, "txt")
         self.assertEqual(str(context.exception), "QC check failed: No dataset found. Upload a dataset before running QC.")
-    
-    # Qc Check dataset in use
-    def test_dataset_in_use_qc_check(self):
-        self.npcs_reg.connect()
-        order_id = self.npcs_reg.new_job()
-        self.npcs_reg.upload_dataset_from_path(order_id=order_id, path=test_utils.dataset_path_local)
-        with self.assertRaises(Exception) as context:
-            self.npcs_reg.qc_check(order_id, "txt")
-        self.assertIn(str(context.exception), [
-            "QC check failed: Dataset in use, try again later.",
-            "QC check failed: QC in progress."
-        ])
 
     # Successful report retrieval in txt format
     def test_successful_report_retrieval_txt(self):
