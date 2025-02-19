@@ -1,6 +1,2 @@
-v1.8.6:
-    - Add get_report API to retrieve a structure API key usage report for a specified date range
-    - Add qc_check API to retrieve QC/Compliance check results
-    - Add "features" option to get_results API to retrieve contents of AIDP.csv features
-    - Add "final_part" param to complete_multipart_upload to indicate last chunk of upload
-        - needed for QC backend to detect a completed upload
+v1.8.7:
+    - Remove test_dataset_in_use_qc_check integration test
