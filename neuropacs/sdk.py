@@ -1,4 +1,4 @@
-# neuropacs Python API v1.8.6
+# neuropacs Python API v1.8.7
 # (c) 2025 neuropacs
 # Released under the MIT License.
 
@@ -1007,9 +1007,7 @@ class Neuropacs:
             if not res.ok:
                 raise Exception(json.loads(res.text)["error"])
 
-            text = res.text
-
-            return self.__decrypt_aes_ctr(text, "string")
+            return self.__decrypt_aes_ctr(res.text, "string")
 
         except Exception as e:
             raise Exception(f"Report retrieval failed: {str(e)}")
