@@ -1,2 +1,4 @@
 v1.8.7:
     - Remove test_dataset_in_use_qc_check integration test
+    - Add sbom.json
+    
